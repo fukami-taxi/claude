@@ -134,34 +134,34 @@ textarea {
   <div class="chips" id="people"></div>
 
   <label for="from">乗車地</label>
-  <input type="text" id="from" list="places" autocomplete="off" placeholder="例：銀座">
+  <input type="text" id="from" list="places" autocomplete="off">
   <div class="chips" id="fromChips"></div>
 
   <label for="to">降車地</label>
-  <input type="text" id="to" list="places" autocomplete="off" placeholder="例：東京駅">
+  <input type="text" id="to" list="places" autocomplete="off">
   <div class="chips" id="toChips"></div>
 
   <label for="time">降車時刻（4桁）</label>
   <div class="row">
-    <input type="tel" id="time" inputmode="numeric" maxlength="4" placeholder="1435">
+    <input type="tel" id="time" inputmode="numeric" maxlength="4">
     <button class="btn sub now" id="nowBtn" type="button">いま</button>
   </div>
 
   <label for="fare">料金（円）</label>
-  <input type="tel" id="fare" inputmode="numeric" placeholder="1850">
+  <input type="tel" id="fare" inputmode="numeric">
 
   <label>支払い方法（なくてもOK）</label>
   <div class="chips" id="pays"></div>
 
   <label for="toll">高速代（円）（なければ、空のまま）</label>
-  <input type="tel" id="toll" inputmode="numeric" placeholder="1200">
+  <input type="tel" id="toll" inputmode="numeric">
 
   <label for="tollBack">帰り高速代（円）（なければ、空のまま）</label>
-  <input type="tel" id="tollBack" inputmode="numeric" placeholder="800">
+  <input type="tel" id="tollBack" inputmode="numeric">
 
   <label>備考（なくてもOK）</label>
   <div class="chips" id="notes" style="display:none"></div>
-  <input type="text" id="note" autocomplete="off" placeholder="その他の備考" style="margin-top:8px">
+  <input type="text" id="note" autocomplete="off" style="margin-top:8px">
 
   <div style="margin-top:14px"><button class="btn" id="addBtn" type="button">追加</button></div>
   <div class="toast" id="toast" role="status"></div>
