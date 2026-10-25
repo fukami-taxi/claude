@@ -126,6 +126,7 @@ textarea {
 <div class="card">
   <label for="date">日付</label>
   <input type="date" id="date">
+  <div class="hint" id="dateJp" style="font-size:16px;color:var(--text);margin-top:8px"></div>
 </div>
 
 <div class="card">
@@ -183,14 +184,16 @@ textarea {
   <div class="chips" id="scope">
     <button type="button" class="chip" data-scope="day">この日だけ</button>
     <button type="button" class="chip" data-scope="unsent">未送信を全部</button>
+    <button type="button" class="chip" data-scope="all">全部の日</button>
   </div>
   <label for="out" style="margin:0">日報用テキスト</label>
-  <textarea id="out" readonly></textarea>
+  <textarea id="out"></textarea>
+  <button class="btn sub" id="resetBtn" type="button">直した文を、もとに戻す</button>
   <button class="btn" id="copyBtn" type="button">コピー</button>
   <button class="btn sub" id="shareBtn" type="button">共有（AirDrop・メッセージなど）</button>
   <button class="btn sub" id="sentBtn" type="button">送信済みにする</button>
   <button class="btn ghost" id="clearBtn" type="button">この日の記録を全部消す</button>
-  <div class="hint">コピーしたテキストを、MacのExcelの取り込み欄に貼ります。入力した内容は、このiPhoneの中にだけ保存されます。</div>
+  <div class="hint">日報用テキストは、文字を直せます。直した文は、コピーや共有に、そのまま使われます（記録を、足したり消したり、日や範囲を、切り替えると、直した文は、消えて、もとの文になります）。入力した内容は、このiPhoneの中にだけ保存されます。</div>
 </div>
 
 <datalist id="places"></datalist>
@@ -233,9 +236,16 @@ textarea {
     var dd = String(d.getDate()).padStart(2, "0");
     return d.getFullYear() + "-" + m + "-" + dd;
   }
+  // 日付は、令和の年で出す（例：8年10月25日。「令和」の文字は、付けない）。2018年より前は、西暦のまま
   function dayLabel(iso) {
     var p = iso.split("-");
-    return parseInt(p[1], 10) + "/" + parseInt(p[2], 10);
+    var y = parseInt(p[0], 10), r = y - 2018;
+    return (r >= 1 ? r : y) + "年" + parseInt(p[1], 10) + "月" + parseInt(p[2], 10) + "日";
+  }
+  function dayJp(iso) {
+    var p = iso.split("-");
+    var w = ["日", "月", "火", "水", "木", "金", "土"][new Date(+p[0], p[1] - 1, +p[2]).getDay()];
+    return dayLabel(iso) + "（" + w + "）";
   }
   function nowHHMM() {
     var d = new Date();
@@ -387,6 +397,7 @@ textarea {
       li.appendChild(no); li.appendChild(body); li.appendChild(del);
       ul.appendChild(li);
     });
+    $("dateJp").textContent = dayJp($("date").value);
     $("count").textContent = trips.length + "件";
     $("total").textContent = "合計 " + total.toLocaleString("ja-JP") + "円";
     $("emptyHint").style.display = trips.length ? "none" : "block";
@@ -396,7 +407,8 @@ textarea {
     for (var c = 0; c < chips.length; c++) {
       chips[c].className = "chip" + (chips[c].getAttribute("data-scope") === scope ? " on" : "");
     }
-    $("sentBtn").textContent = scope === "unsent" ? "未送信の日を、全部、送信済みにする" : "この日を、送信済みにする";
+    $("sentBtn").textContent = scope === "unsent" ? "未送信の日を、全部、送信済みにする"
+      : scope === "all" ? "全部の日を、送信済みにする" : "この日を、送信済みにする";
   }
   function daysWithTrips() {
     return Object.keys(days).filter(function (k) { return days[k] && days[k].length; }).sort();
@@ -407,6 +419,7 @@ textarea {
     return lines.join("\n");
   }
   function targetDays() {
+    if (scope === "all") return daysWithTrips();
     if (scope === "unsent") return daysWithTrips().filter(function (k) { return !sent[k]; });
     var k = $("date").value;
     return days[k] && days[k].length ? [k] : [];
@@ -472,11 +485,10 @@ textarea {
     var text = $("out").value;
     if (!text) { toast("コピーする記録がありません"); return; }
     function fallback() {
-      var ta = $("out"); ta.removeAttribute("readonly"); ta.focus(); ta.select();
+      var ta = $("out"); ta.focus(); ta.select();
       ta.setSelectionRange(0, text.length);
       var ok = false;
       try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
-      ta.setAttribute("readonly", "readonly");
       toast(ok ? "コピーしました" : "コピーできませんでした。文字を長押ししてコピーしてください");
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -504,6 +516,7 @@ textarea {
   $("date").addEventListener("change", function () { renderList(); });
   $("addBtn").addEventListener("click", addTrip);
   $("copyBtn").addEventListener("click", copyText);
+  $("resetBtn").addEventListener("click", function () { $("out").value = buildText(); toast("もとの文に戻しました"); });
   $("shareBtn").addEventListener("click", shareText);
   $("clearBtn").addEventListener("click", clearDay);
   $("sentBtn").addEventListener("click", function () {
