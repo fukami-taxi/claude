@@ -704,7 +704,8 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
   $("todayBtn").addEventListener("click", function () { setDay(todayStr()); });
   $("date").addEventListener("change", function () { if (this.value) setDay(this.value); });
   $("addBtn").addEventListener("click", addItem);
-  $("clearKcalBtn").addEventListener("click", function () { $("kcal").value = ""; $("kcal").focus(); });
+  // 「クリア」：食べたものと、カロリーの、両方を、空にする（直している最中でも、欄だけ、空にする）
+  $("clearKcalBtn").addEventListener("click", function () { $("name").value = ""; $("kcal").value = ""; $("name").focus(); });
   $("kcal").addEventListener("keydown", function (e) { if (e.key === "Enter") addItem(); });
   $("setBtn").addEventListener("click", saveGoal);
   $("weight").addEventListener("input", function () { saveWeight(false); });
