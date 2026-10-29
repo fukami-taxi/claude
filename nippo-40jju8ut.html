@@ -108,6 +108,8 @@ button { font-family: inherit; }
 .list .no { color: var(--muted); width: 28px; flex: 0 0 auto; }
 .list .body { flex: 1; min-width: 0; font-size: 16px; }
 .list .sub { color: var(--muted); font-size: 14px; }
+.list .edit { flex: 0 0 auto; min-width: 44px; min-height: 44px; border: 1px solid var(--line); background: transparent; color: var(--accent); border-radius: 10px; font-size: 16px; }
+.list li.editing { background: var(--chip); border-radius: 10px; }
 .list .del { flex: 0 0 auto; min-width: 44px; min-height: 44px; border: 1px solid var(--line); background: transparent; color: var(--danger); border-radius: 10px; font-size: 16px; }
 textarea {
   width: 100%; min-height: 150px; font-size: 16px; padding: 10px 12px;
@@ -130,6 +132,7 @@ textarea {
 </div>
 
 <div class="card">
+  <div id="editNote" style="display:none;font-weight:700;color:var(--accent);margin-bottom:8px"></div>
   <label>人数</label>
   <div class="chips" id="people"></div>
 
@@ -164,6 +167,7 @@ textarea {
   <input type="text" id="note" autocomplete="off" style="margin-top:8px">
 
   <div style="margin-top:14px"><button class="btn" id="addBtn" type="button">追加</button></div>
+  <div style="margin-top:8px"><button class="btn sub" id="cancelEditBtn" type="button" style="display:none">直すのを、やめる</button></div>
   <div class="toast" id="toast" role="status"></div>
 </div>
 
@@ -227,6 +231,8 @@ textarea {
   var sent = load(KEY_SENT, {});
   var scope = load(KEY_SCOPE, "day");
   var people = 1;
+  var editIndex = null;   // 直している記録の、番号（0から）。直していないときは null
+  var editDate = null;    // 直している記録の、日付
   var selectedNotes = {};
   var selectedPay = "";
 
@@ -392,9 +398,13 @@ textarea {
       body.appendChild(sub);
       var del = document.createElement("button"); del.className = "del"; del.type = "button"; del.textContent = "削除";
       del.addEventListener("click", function () {
+        if (editIndex !== null) { endEdit(); clearForm(); }
         trips.splice(i, 1); delete sent[$("date").value]; save(KEY_SENT, sent); save(KEY_DAYS, days); renderAll();
       });
-      li.appendChild(no); li.appendChild(body); li.appendChild(del);
+      var edit = document.createElement("button"); edit.className = "edit"; edit.type = "button"; edit.textContent = "編集";
+      edit.addEventListener("click", function () { startEdit(i, t); renderList(); window.scrollTo(0, 0); });
+      if (editIndex === i && editDate === $("date").value) li.className = "editing";
+      li.appendChild(no); li.appendChild(body); li.appendChild(edit); li.appendChild(del);
       ul.appendChild(li);
     });
     $("dateJp").textContent = dayJp($("date").value);
@@ -440,7 +450,7 @@ textarea {
       body.appendChild(document.createElement("br")); body.appendChild(tag);
       var go = document.createElement("button"); go.className = "del"; go.type = "button"; go.textContent = "開く";
       go.style.color = "var(--accent)";
-      go.addEventListener("click", function () { $("date").value = k; renderAll(); window.scrollTo(0, 0); });
+      go.addEventListener("click", function () { if (editIndex !== null) { endEdit(); clearForm(); } $("date").value = k; renderAll(); window.scrollTo(0, 0); });
       li.appendChild(body); li.appendChild(go);
       ul.appendChild(li);
     });
@@ -448,6 +458,37 @@ textarea {
   }
   function renderAll() { renderPlaces(); renderList(); }
 
+  function clearForm() {
+    $("from").value = "";
+    $("to").value = "";
+    $("time").value = "";
+    $("fare").value = "";
+    $("note").value = "";
+    $("toll").value = "";
+    $("tollBack").value = "";
+    selectedNotes = {};
+    selectedPay = "";
+    people = 1;
+    renderPeople(); renderPay(); renderNotes();
+  }
+  function startEdit(i, t) {
+    people = t.people; renderPeople();
+    $("from").value = t.from; $("to").value = t.to; $("time").value = t.time; $("fare").value = String(t.fare);
+    selectedPay = t.pay || ""; renderPay();
+    $("toll").value = t.toll ? String(t.toll) : ""; $("tollBack").value = t.tollBack ? String(t.tollBack) : "";
+    selectedNotes = {}; renderNotes(); $("note").value = t.note || "";
+    editIndex = i; editDate = $("date").value;
+    $("addBtn").textContent = "直して保存";
+    $("cancelEditBtn").style.display = "block";
+    $("editNote").style.display = "block";
+    $("editNote").textContent = "いま、" + (i + 1) + "件目を、直しています";
+  }
+  function endEdit() {
+    editIndex = null; editDate = null;
+    $("addBtn").textContent = "追加";
+    $("cancelEditBtn").style.display = "none";
+    $("editNote").style.display = "none";
+  }
   function addTrip() {
     var from = $("from").value.trim();
     var to = $("to").value.trim();
@@ -462,23 +503,16 @@ textarea {
     var extra = $("note").value.trim();
     if (extra) notes.push(extra);
     var trip = { people: people, from: from, to: to, time: time, fare: parseInt(fareRaw, 10), pay: selectedPay, toll: toll, tollBack: tollBack, note: notes.join(" ") };
-    currentTrips().push(trip);
+    var wasEdit = (editIndex !== null && editDate === $("date").value && editIndex < currentTrips().length);
+    var doneMsg = null;
+    if (wasEdit) { currentTrips()[editIndex] = trip; doneMsg = (editIndex + 1) + "件目を、直しました"; }
+    else { currentTrips().push(trip); }
     delete sent[$("date").value]; save(KEY_SENT, sent);
     rememberPlace(from); rememberPlace(to);
     save(KEY_DAYS, days);
-    // 追加したあとは、全部の欄を、空にする（乗車地も）
-    $("from").value = "";
-    $("to").value = "";
-    $("time").value = "";
-    $("fare").value = "";
-    $("note").value = "";
-    $("toll").value = "";
-    $("tollBack").value = "";
-    selectedNotes = {};
-    selectedPay = "";
-    people = 1;
-    renderPeople(); renderPay(); renderNotes(); renderAll();
-    toast(currentTrips().length + "件目を追加しました");
+    // 追加したあと（直したあと）は、全部の欄を、空にする（乗車地も）
+    endEdit(); clearForm(); renderAll();
+    toast(doneMsg || (currentTrips().length + "件目を追加しました"));
   }
 
   function copyText() {
@@ -505,6 +539,7 @@ textarea {
   function clearDay() {
     if (!currentTrips().length) return;
     if (window.confirm(dayLabel($("date").value) + " の記録を、全部消します。よろしいですか？")) {
+      if (editIndex !== null) { endEdit(); clearForm(); }
       days[$("date").value] = [];
       save(KEY_DAYS, days);
       renderAll();
@@ -513,7 +548,11 @@ textarea {
   }
 
   $("date").value = todayStr();
-  $("date").addEventListener("change", function () { renderList(); });
+  $("date").addEventListener("change", function () {
+    if (editIndex !== null) { endEdit(); clearForm(); toast("日を変えたので、直すのを、やめました"); }
+    renderList();
+  });
+  $("cancelEditBtn").addEventListener("click", function () { endEdit(); clearForm(); renderList(); toast("直すのを、やめました"); });
   $("addBtn").addEventListener("click", addTrip);
   $("copyBtn").addEventListener("click", copyText);
   $("resetBtn").addEventListener("click", function () { $("out").value = buildText(); toast("もとの文に戻しました"); });
