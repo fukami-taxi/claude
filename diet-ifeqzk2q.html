@@ -103,6 +103,15 @@ input[type=text], input[type=tel], input[type=date] {
 .stat .k { font-size: 13px; color: var(--muted); }
 .stat .v { font-size: 20px; font-weight: 800; }
 svg.bars { width: 100%; height: auto; display: block; }
+.pres { background: var(--accent-soft); border-radius: 14px; padding: 10px 12px; margin-top: 10px; }
+.pres .pt { font-weight: 800; }
+.pres .pc { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.pres ul { list-style: none; margin: 8px 0 0; padding: 0; }
+.pres li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); }
+.pres li .nm { flex: 1; min-width: 0; word-break: break-word; }
+.pres li .pn { color: var(--muted); font-size: 12px; display: block; }
+.pres li .kc { font-weight: 700; white-space: nowrap; }
+.pres li button { flex: 0 0 auto; min-height: 40px; padding: 4px 12px; border: 1px solid var(--line); background: var(--card); border-radius: 10px; font-size: 14px; font-family: inherit; color: var(--accent); }
 textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--text); font-family: ui-monospace, Menlo, monospace; }
 </style>
 </head>
@@ -137,9 +146,14 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
   <label for="name">食べたもの</label>
   <input type="text" id="name" autocomplete="off">
   <button class="btn sub" id="micBtn" type="button" style="margin-top:10px;display:none">🎤 話して入れる（例：ラーメン 550キロカロリー）</button>
+  <button class="btn sub" id="photoBtn" type="button" style="margin-top:10px">📷 写真で入れる（料理を撮って、カロリーの目安を出す）</button>
+  <input type="file" id="photoFile" accept="image/*" style="display:none">
+  <div class="hint" id="photoStatus" role="status"></div>
+  <div id="photoResult"></div>
   <div class="row" style="margin-top:10px">
     <div class="kcalbox grow"><input type="tel" id="kcal" inputmode="numeric" autocomplete="off" aria-label="カロリー"><span>kcal</span></div>
-    <div style="flex:0 0 130px"><button class="btn" id="addBtn" type="button">追加</button></div>
+    <div style="flex:0 0 84px"><button class="btn ghost" id="clearKcalBtn" type="button" style="color:var(--text);padding-left:6px;padding-right:6px">クリア</button></div>
+    <div style="flex:0 0 112px"><button class="btn" id="addBtn" type="button">追加</button></div>
   </div>
   <label id="freqLabel">よく食べるもの（タップで、入れる）</label>
   <div class="chips" id="freq"></div>
@@ -172,6 +186,15 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
   <input type="tel" id="goalKcal" inputmode="numeric" autocomplete="off">
   <div style="margin-top:12px"><button class="btn sub" id="setBtn" type="button">目標を保存</button></div>
   <div class="hint">空にすると、目標なしで、合計だけを出します。</div>
+</div>
+
+<div class="card">
+  <label class="first" for="photoUrl">写真でカロリーを調べる（設定）：サーバーのURL</label>
+  <input type="text" id="photoUrl" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+  <label for="photoToken">合言葉（サーバーと、同じもの）</label>
+  <input type="text" id="photoToken" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+  <div style="margin-top:12px"><button class="btn sub" id="photoSetBtn" type="button">設定を保存</button></div>
+  <div class="hint">写真は、このiPhoneから、あなたの、サーバーを通して、Claude（Anthropic）に、送られます。顔や、書類、住所が、写らないように、してください。カロリーは、写真からの、目安です。実際とは、違うことが、あります。この設定は、このiPhoneの中にだけ、保存され、バックアップには、入りません。</div>
 </div>
 
 <div class="card stack">
@@ -588,6 +611,88 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
     });
   }
 
+  // ---- 写真で入れる：写真を、小さくして、自分のサーバーに、送る → 料理名と、カロリーの目安が、返る ----
+  var KEY_P = "rec.photo.v1";
+  var photo = load(KEY_P, {});          // { url, token }（この端末の中にだけ、保存。バックアップには、入れない）
+  function resizeToJpeg(file, maxSide) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        var k = Math.min(1, maxSide / Math.max(img.width, img.height));
+        var c = document.createElement("canvas"); c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL("image/jpeg", 0.82).split(",")[1]);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("写真を、読み込めませんでした")); };
+      img.src = url;
+    });
+  }
+  function photoMsg(t) { $("photoStatus").textContent = t || ""; }
+  function renderPhotoResult(res) {
+    var box = $("photoResult"); box.innerHTML = "";
+    var items = (res && res.items) || [];
+    var wrap = document.createElement("div"); wrap.className = "pres";
+    var t = document.createElement("div"); t.className = "pt";
+    t.textContent = items.length ? "合計の目安：約 " + num(res.total_kcal || items.reduce(function (a, x) { return a + (x.kcal || 0); }, 0)) + " kcal" : "料理が、見つかりませんでした";
+    wrap.appendChild(t);
+    if (items.length) {
+      var ul = document.createElement("ul");
+      items.forEach(function (it) {
+        var li = document.createElement("li");
+        var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = it.name;
+        if (it.portion_note) { var pn = document.createElement("span"); pn.className = "pn"; pn.textContent = it.portion_note; nm.appendChild(pn); }
+        var kc = document.createElement("span"); kc.className = "kc"; kc.textContent = num(it.kcal) + " kcal";
+        var b = document.createElement("button"); b.type = "button"; b.textContent = "入れる";
+        b.addEventListener("click", function () { $("name").value = it.name; $("kcal").value = String(it.kcal); toast("「" + it.name + "」を、入れました。確かめて、「追加」を押してください"); });
+        li.appendChild(nm); li.appendChild(kc); li.appendChild(b); ul.appendChild(li);
+      });
+      wrap.appendChild(ul);
+      if (items.length > 1) {
+        var all = document.createElement("button"); all.type = "button"; all.className = "btn sub"; all.style.marginTop = "8px"; all.textContent = "全部を、「" + meal + "」に、追加";
+        all.addEventListener("click", function () {
+          var d = dayOf(cur);
+          items.forEach(function (it) { d.items.push({ id: Date.now() + Math.floor(Math.random() * 100000), meal: meal, name: it.name, kcal: it.kcal }); });
+          save(KEY_D, days); box.innerHTML = ""; renderAll(); toast(items.length + "件を、追加しました");
+        });
+        wrap.appendChild(all);
+      }
+    }
+    if (res && res.caveat) { var c = document.createElement("div"); c.className = "pc"; c.textContent = res.caveat; wrap.appendChild(c); }
+    box.appendChild(wrap);
+  }
+  function showPhotoBtn() { $("photoBtn").style.display = (photo.url && photo.token) ? "block" : "none"; }
+  function setupPhoto() {
+    $("photoUrl").value = photo.url || ""; $("photoToken").value = photo.token || "";
+    showPhotoBtn();
+    $("photoSetBtn").addEventListener("click", function () {
+      photo = { url: $("photoUrl").value.trim(), token: $("photoToken").value.trim() };
+      if (photo.url && !/^https:\/\//.test(photo.url)) { toast("URLは、https:// で、始めてください"); return; }
+      save(KEY_P, photo); showPhotoBtn(); toast("写真の設定を、保存しました");
+    });
+    $("photoBtn").addEventListener("click", function () {
+      if (!photo.url || !photo.token) { photoMsg("先に、いちばん下の「写真でカロリーを調べる（設定）」に、サーバーのURLと、合言葉を、入れてください。"); return; }
+      photoMsg(""); $("photoFile").value = ""; $("photoFile").click();
+    });
+    $("photoFile").addEventListener("change", function () {
+      var f = this.files && this.files[0];
+      if (!f) return;
+      $("photoResult").innerHTML = ""; photoMsg("調べています…（数秒かかります）"); $("photoBtn").disabled = true;
+      resizeToJpeg(f, 1280).then(function (b64) {
+        return fetch(photo.url, { method: "POST", headers: { "Content-Type": "application/json", "X-App-Token": photo.token }, body: JSON.stringify({ image: b64, mediaType: "image/jpeg" }) });
+      }).then(function (r) {
+        return r.json().catch(function () { return null; }).then(function (data) {
+          if (!r.ok) throw new Error(r.status === 401 ? "合言葉が、違います（設定を、確かめてください）" : r.status === 413 ? "写真が、大きすぎます" : r.status === 429 ? "いま、混んでいます。少し待って、もう一度、お試しください" : (data && data.error) || "うまく、いきませんでした（" + r.status + "）");
+          return data;
+        });
+      }).then(function (res) {
+        photoMsg(""); renderPhotoResult(res);
+      }).catch(function (e) {
+        photoMsg((e && e.message && e.message !== "Failed to fetch") ? e.message : "サーバーに、つながりませんでした。URLと、電波を、確かめてください");
+      }).then(function () { $("photoBtn").disabled = false; });
+    });
+  }
+
   function init() {
     $("goalKcal").value = settings.goalKcal ? String(settings.goalKcal) : "";
     cur = cur || todayStr(); meal = meal || autoMeal();
@@ -599,6 +704,7 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
   $("todayBtn").addEventListener("click", function () { setDay(todayStr()); });
   $("date").addEventListener("change", function () { if (this.value) setDay(this.value); });
   $("addBtn").addEventListener("click", addItem);
+  $("clearKcalBtn").addEventListener("click", function () { $("kcal").value = ""; $("kcal").focus(); });
   $("kcal").addEventListener("keydown", function (e) { if (e.key === "Enter") addItem(); });
   $("setBtn").addEventListener("click", saveGoal);
   $("weight").addEventListener("input", function () { saveWeight(false); });
@@ -618,6 +724,7 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
     $(id).addEventListener("blur", function () { this.value = toHalf(this.value); });
   });
   setupMic();
+  setupPhoto();
   window.__parseSpeech = parseSpeech;   // 動作の確認用
   window.__csvText = csvText;
   init();
