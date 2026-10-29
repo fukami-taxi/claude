@@ -176,7 +176,8 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
 
 <div class="card stack">
   <label class="first">バックアップ</label>
-  <button class="btn sub" id="shareBtn" type="button">共有（Dropboxに保存など）</button>
+  <button class="btn sub" id="csvBtn" type="button">表（CSV）で共有（Excel用）</button>
+  <button class="btn sub" id="shareBtn" type="button">共有（もどす用の、バックアップ）</button>
   <button class="btn sub" id="copyBtn" type="button">コピー</button>
   <label for="restore" style="margin-top:14px">もどす（バックアップの文章を貼って、「もどす」）</label>
   <textarea id="restore" autocomplete="off"></textarea>
@@ -470,6 +471,35 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
       navigator.clipboard.writeText(text).then(function () { toast("コピーしました"); }, fallback);
     } else fallback();
   }
+  // ---- 表（CSV）：1行が、1回の食事。体重は、その日の、1行目に入れる ----
+  function csvCell(v) {
+    var t = String(v === undefined || v === null ? "" : v);
+    return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+  }
+  function csvText() {
+    var rows = [["日付", "朝昼夜", "食べたもの", "カロリー", "体重"]];
+    var order = {}; MEALS.forEach(function (m, i) { order[m] = i; });
+    Object.keys(days).sort().forEach(function (k) {
+      var d = days[k], its = (d.items || []).slice().sort(function (a, b) { return (order[a.meal] || 0) - (order[b.meal] || 0); });
+      var w = typeof d.w === "number" ? d.w : "";
+      if (!its.length) { if (w !== "") rows.push([k, "", "", "", w]); return; }
+      its.forEach(function (it, i) { rows.push([k, it.meal, it.name, it.kcal, i === 0 ? w : ""]); });
+    });
+    return rows.map(function (r) { return r.map(csvCell).join(","); }).join("\r\n");
+  }
+  function shareCsv() {
+    if (!hasData()) { toast("表にする記録がありません"); return; }
+    var text = "\ufeff" + csvText();   // 先頭の印（BOM）：Excelで、日本語が、文字化けしない
+    var name = "ダイエット_" + todayStr() + ".csv";
+    try {
+      var file = new File([text], name, { type: "text/csv" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: name }).catch(function () { /* cancelled */ });
+        return;
+      }
+    } catch (e) { /* fall through */ }
+    copyText(csvText()); toast("表の文章を、コピーしました（Excelに、貼り付けてください）");
+  }
   function shareBackup() {
     if (!hasData()) { toast("バックアップする記録がありません"); return; }
     var text = backupText();
@@ -573,6 +603,7 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
   $("setBtn").addEventListener("click", saveGoal);
   $("weight").addEventListener("input", function () { saveWeight(false); });
   $("weight").addEventListener("blur", function () { this.value = toHalf(this.value); saveWeight(true); });
+  $("csvBtn").addEventListener("click", shareCsv);
   $("shareBtn").addEventListener("click", shareBackup);
   $("copyBtn").addEventListener("click", function () { if (!hasData()) { toast("バックアップする記録がありません"); return; } copyText(backupText()); });
   $("restoreBtn").addEventListener("click", restore);
@@ -588,6 +619,7 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
   });
   setupMic();
   window.__parseSpeech = parseSpeech;   // 動作の確認用
+  window.__csvText = csvText;
   init();
 })();
 </script>
