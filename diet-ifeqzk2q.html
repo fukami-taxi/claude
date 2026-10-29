@@ -83,7 +83,10 @@ input[type=text], input[type=tel], input[type=date] {
 .btn { min-height: 54px; border-radius: 14px; border: 0; font-size: 18px; font-weight: 700; padding: 10px 16px; background: var(--accent); color: var(--accent-text); width: 100%; font-family: inherit; }
 .btn.sub { background: var(--accent-soft); color: var(--text); font-weight: 600; }
 .btn.ghost { background: transparent; color: var(--danger); border: 1px solid var(--line); font-weight: 600; }
-.toast { color: var(--accent); min-height: 22px; margin-top: 8px; font-size: 15px; }
+/* お知らせは、画面の下に、浮かせて出す（どの場所の、ボタンを、押しても、見える） */
+.toast { position: fixed; left: 16px; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom)); max-width: 528px; margin: 0 auto; z-index: 50;
+  background: var(--text); color: var(--bg); padding: 12px 14px; border-radius: 12px; font-size: 15px; font-weight: 600; text-align: center; box-shadow: 0 4px 16px rgba(0,0,0,.28); }
+.toast:empty { display: none; }
 .hint { color: var(--muted); font-size: 14px; margin-top: 8px; }
 .stack > * + * { margin-top: 10px; }
 .meal { margin-bottom: 14px; }
@@ -103,15 +106,6 @@ input[type=text], input[type=tel], input[type=date] {
 .stat .k { font-size: 13px; color: var(--muted); }
 .stat .v { font-size: 20px; font-weight: 800; }
 svg.bars { width: 100%; height: auto; display: block; }
-.pres { background: var(--accent-soft); border-radius: 14px; padding: 10px 12px; margin-top: 10px; }
-.pres .pt { font-weight: 800; }
-.pres .pc { color: var(--muted); font-size: 13px; margin-top: 4px; }
-.pres ul { list-style: none; margin: 8px 0 0; padding: 0; }
-.pres li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); }
-.pres li .nm { flex: 1; min-width: 0; word-break: break-word; }
-.pres li .pn { color: var(--muted); font-size: 12px; display: block; }
-.pres li .kc { font-weight: 700; white-space: nowrap; }
-.pres li button { flex: 0 0 auto; min-height: 40px; padding: 4px 12px; border: 1px solid var(--line); background: var(--card); border-radius: 10px; font-size: 14px; font-family: inherit; color: var(--accent); }
 textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--text); font-family: ui-monospace, Menlo, monospace; }
 </style>
 </head>
@@ -146,10 +140,6 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
   <label for="name">食べたもの</label>
   <input type="text" id="name" autocomplete="off">
   <button class="btn sub" id="micBtn" type="button" style="margin-top:10px;display:none">🎤 話して入れる（例：ラーメン 550キロカロリー）</button>
-  <button class="btn sub" id="photoBtn" type="button" style="margin-top:10px">📷 写真で入れる（料理を撮って、カロリーの目安を出す）</button>
-  <input type="file" id="photoFile" accept="image/*" style="display:none">
-  <div class="hint" id="photoStatus" role="status"></div>
-  <div id="photoResult"></div>
   <div class="row" style="margin-top:10px">
     <div class="kcalbox grow"><input type="tel" id="kcal" inputmode="numeric" autocomplete="off" aria-label="カロリー"><span>kcal</span></div>
     <div style="flex:0 0 84px"><button class="btn ghost" id="clearKcalBtn" type="button" style="color:var(--text);padding-left:6px;padding-right:6px">クリア</button></div>
@@ -188,23 +178,17 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
   <div class="hint">空にすると、目標なしで、合計だけを出します。</div>
 </div>
 
-<div class="card">
-  <label class="first" for="photoUrl">写真でカロリーを調べる（設定）：サーバーのURL</label>
-  <input type="text" id="photoUrl" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
-  <label for="photoToken">合言葉（サーバーと、同じもの）</label>
-  <input type="text" id="photoToken" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
-  <div style="margin-top:12px"><button class="btn sub" id="photoSetBtn" type="button">設定を保存</button></div>
-  <div class="hint">写真は、このiPhoneから、あなたの、サーバーを通して、Claude（Anthropic）に、送られます。顔や、書類、住所が、写らないように、してください。カロリーは、写真からの、目安です。実際とは、違うことが、あります。この設定は、このiPhoneの中にだけ、保存され、バックアップには、入りません。</div>
-</div>
-
 <div class="card stack">
   <label class="first">バックアップ</label>
   <button class="btn sub" id="csvBtn" type="button">表（CSV）で共有（Excel用）</button>
   <button class="btn sub" id="shareBtn" type="button">共有（もどす用の、バックアップ）</button>
-  <button class="btn sub" id="copyBtn" type="button">コピー</button>
-  <label for="restore" style="margin-top:14px">もどす（バックアップの文章を貼って、「もどす」）</label>
+  <button class="btn sub" id="copyBtn" type="button">コピー（もどす用の、バックアップ）</button>
+  <textarea id="manualOut" readonly style="display:none" aria-label="コピーできなかったときの、文章"></textarea>
+  <label for="restore" style="margin-top:14px">もどす（バックアップの文章、または、CSVの文章を、貼って、「もどす」）</label>
   <textarea id="restore" autocomplete="off"></textarea>
   <button class="btn sub" id="restoreBtn" type="button">もどす</button>
+  <button class="btn sub" id="csvRestoreBtn" type="button">CSVのファイルから、もどす（Dropboxなどから、選ぶ）</button>
+  <input type="file" id="csvFile" accept=".csv,text/csv,text/plain,text/comma-separated-values" multiple style="display:none">
   <button class="btn ghost" id="clearBtn" type="button">全部の記録を消す</button>
   <div class="hint">記録は、このiPhoneの中にだけ保存されます。機種変更や、Safariのデータ消去に備えて、ときどき、バックアップを取ってください。カロリーの数字は、あなたが、入れたものです。このアプリは、計算を、しません（足し算だけです）。</div>
 </div>
@@ -262,7 +246,7 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
   function toast(msg) {
     $("toast").textContent = msg;
     window.clearTimeout(toast.t);
-    toast.t = window.setTimeout(function () { $("toast").textContent = ""; }, 2500);
+    toast.t = window.setTimeout(function () { $("toast").textContent = ""; }, 3500);
   }
   function dayOf(k) { if (!days[k]) days[k] = { items: [] }; if (!days[k].items) days[k].items = []; return days[k]; }
   function totalOf(k) {
@@ -488,7 +472,13 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
       document.body.appendChild(ta); ta.focus(); ta.select();
       var ok = false; try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
       document.body.removeChild(ta);
-      toast(ok ? "コピーしました" : "コピーできませんでした");
+      if (ok) { toast("コピーしました"); $("manualOut").style.display = "none"; }
+      else {
+        // 自動で、コピーできなかったとき：文章を、見える欄に、出す。長押しして、コピーしてもらう
+        var m = $("manualOut"); m.value = text; m.style.display = "block"; m.focus(); m.select();
+        try { m.setSelectionRange(0, text.length); } catch (e) { /* ignore */ }
+        toast("自動では、コピーできませんでした。下の文字を、長押しして、「コピー」を、押してください");
+      }
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(function () { toast("コピーしました"); }, fallback);
@@ -530,9 +520,85 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
       navigator.share({ title: "カロリー記録 " + todayStr(), text: text }).catch(function () { /* cancelled */ });
     } else copyText(text);
   }
+  // ---- CSVから、もどす：「日付,朝昼夜,食べたもの,カロリー,体重」の表を、読んで、記録に、もどす ----
+  var CSV_HEAD = ["日付", "朝昼夜", "食べたもの", "カロリー", "体重"];
+  function parseCsv(text) {
+    text = String(text).replace(/^\ufeff/, "");
+    var rows = [], row = [], cur = "", q = false, i, c;
+    for (i = 0; i < text.length; i++) {
+      c = text.charAt(i);
+      if (q) {
+        if (c === '"') { if (text.charAt(i + 1) === '"') { cur += '"'; i++; } else q = false; }
+        else cur += c;
+      } else if (c === '"') q = true;
+      else if (c === ",") { row.push(cur); cur = ""; }
+      else if (c === "\n" || c === "\r") { if (c === "\r" && text.charAt(i + 1) === "\n") i++; row.push(cur); cur = ""; rows.push(row); row = []; }
+      else cur += c;
+    }
+    if (cur !== "" || row.length) { row.push(cur); rows.push(row); }
+    return rows.filter(function (r) { return r.some(function (x) { return x.trim() !== ""; }); });
+  }
+  // 1つのCSVの文章 → { 日付: { items: [...], w: 体重 or undefined } }。読めなければ、{ error: "…" }
+  function csvToDays(text) {
+    var rows = parseCsv(text);
+    if (!rows.length) return { error: "中身が、空です" };
+    var head = rows[0].map(function (x) { return x.trim(); });
+    if (head.slice(0, 5).join(",") !== CSV_HEAD.join(",")) return { error: "このアプリの、CSVでは、ありません（1行目が、違います）" };
+    var out = {}, n = 0;
+    for (var r = 1; r < rows.length; r++) {
+      var x = rows[r].concat(["", "", "", "", ""]), line = r + 1;
+      var date = x[0].trim(), mealName = x[1].trim(), name = x[2].trim(), kc = toHalf(x[3]).replace(/[^0-9]/g, ""), w = parseNum(x[4]);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: line + "行目の、日付が、読み取れません：" + x[0] };
+      var d = out[date] || (out[date] = { items: [] });
+      if (w !== null) { if (w < 20 || w > 300) return { error: line + "行目の、体重が、おかしいです：" + x[4] }; d.w = Math.round(w * 10) / 10; }
+      if (name || kc) {
+        if (MEALS.indexOf(mealName) < 0) return { error: line + "行目の、「朝昼夜」が、読み取れません：" + x[1] };
+        if (!name || !kc) return { error: line + "行目に、食べたもの、または、カロリーが、足りません" };
+        d.items.push({ id: Date.now() * 1000 + (++n), meal: mealName, name: name, kcal: parseInt(kc, 10) });
+      }
+    }
+    return { days: out };
+  }
+  // 複数のCSVを、古い順に、重ねる。同じ日は、新しいCSVの、その日の記録で、置き換える
+  function applyCsvTexts(texts, label) {
+    var merged = {}, i, r, k;
+    for (i = 0; i < texts.length; i++) {
+      r = csvToDays(texts[i].text);
+      if (r.error) { toast((texts[i].name ? texts[i].name + "：" : "") + r.error); return false; }
+      for (k in r.days) merged[k] = r.days[k];
+    }
+    var keys = Object.keys(merged).sort();
+    if (!keys.length) { toast("もどす記録が、ありません"); return false; }
+    var count = keys.reduce(function (a, k) { return a + merged[k].items.length; }, 0);
+    var overlap = keys.filter(function (k) { return days[k] && ((days[k].items || []).length || typeof days[k].w === "number"); }).length;
+    var msg = (label || "CSV") + "から、" + keys.length + "日分（食べたもの " + count + "件）を、もどします。";
+    if (overlap) msg += "\nそのうち " + overlap + "日は、いま、アプリに、ある記録を、CSVの内容で、置き換えます。";
+    msg += "\nよろしいですか？";
+    if (!window.confirm(msg)) return false;
+    keys.forEach(function (k) {
+      var d = days[k] || (days[k] = { items: [] });
+      d.items = merged[k].items;
+      if (typeof merged[k].w === "number") d.w = merged[k].w;
+    });
+    save(KEY_D, days); init(); toast(keys.length + "日分を、もどしました");
+    return true;
+  }
+  function readFiles(files) {
+    var list = Array.prototype.slice.call(files).sort(function (a, b) {
+      var da = (a.name.match(/\d{4}-\d{2}-\d{2}/) || [""])[0], db = (b.name.match(/\d{4}-\d{2}-\d{2}/) || [""])[0];
+      return da < db ? -1 : da > db ? 1 : (a.lastModified || 0) - (b.lastModified || 0);
+    });
+    Promise.all(list.map(function (f) {
+      return new Promise(function (res, rej) {
+        var fr = new FileReader(); fr.onload = function () { res({ name: f.name, text: String(fr.result) }); }; fr.onerror = function () { rej(new Error("読み込めません")); }; fr.readAsText(f, "utf-8");
+      });
+    })).then(function (texts) { applyCsvTexts(texts, texts.length === 1 ? "「" + texts[0].name + "」" : "CSV " + texts.length + "個"); })
+      .catch(function () { toast("ファイルを、読み込めませんでした"); });
+  }
   function restore() {
     var raw = $("restore").value.trim();
     if (!raw) { toast("バックアップの文章を貼ってください"); return; }
+    if (raw.charAt(0) !== "{" && raw.indexOf("日付,朝昼夜") >= 0) { if (applyCsvTexts([{ name: "", text: raw }], "貼り付けた、CSV")) $("restore").value = ""; return; }
     var data;
     try { data = JSON.parse(raw); } catch (e) { toast("文章を読み取れませんでした"); return; }
     if (!data || data.app !== "calorie-rec" || typeof data.days !== "object") { toast("このアプリの、バックアップでは、ありません"); return; }
@@ -611,88 +677,6 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
     });
   }
 
-  // ---- 写真で入れる：写真を、小さくして、自分のサーバーに、送る → 料理名と、カロリーの目安が、返る ----
-  var KEY_P = "rec.photo.v1";
-  var photo = load(KEY_P, {});          // { url, token }（この端末の中にだけ、保存。バックアップには、入れない）
-  function resizeToJpeg(file, maxSide) {
-    return new Promise(function (resolve, reject) {
-      var url = URL.createObjectURL(file), img = new Image();
-      img.onload = function () {
-        var k = Math.min(1, maxSide / Math.max(img.width, img.height));
-        var c = document.createElement("canvas"); c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
-        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-        URL.revokeObjectURL(url);
-        resolve(c.toDataURL("image/jpeg", 0.82).split(",")[1]);
-      };
-      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("写真を、読み込めませんでした")); };
-      img.src = url;
-    });
-  }
-  function photoMsg(t) { $("photoStatus").textContent = t || ""; }
-  function renderPhotoResult(res) {
-    var box = $("photoResult"); box.innerHTML = "";
-    var items = (res && res.items) || [];
-    var wrap = document.createElement("div"); wrap.className = "pres";
-    var t = document.createElement("div"); t.className = "pt";
-    t.textContent = items.length ? "合計の目安：約 " + num(res.total_kcal || items.reduce(function (a, x) { return a + (x.kcal || 0); }, 0)) + " kcal" : "料理が、見つかりませんでした";
-    wrap.appendChild(t);
-    if (items.length) {
-      var ul = document.createElement("ul");
-      items.forEach(function (it) {
-        var li = document.createElement("li");
-        var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = it.name;
-        if (it.portion_note) { var pn = document.createElement("span"); pn.className = "pn"; pn.textContent = it.portion_note; nm.appendChild(pn); }
-        var kc = document.createElement("span"); kc.className = "kc"; kc.textContent = num(it.kcal) + " kcal";
-        var b = document.createElement("button"); b.type = "button"; b.textContent = "入れる";
-        b.addEventListener("click", function () { $("name").value = it.name; $("kcal").value = String(it.kcal); toast("「" + it.name + "」を、入れました。確かめて、「追加」を押してください"); });
-        li.appendChild(nm); li.appendChild(kc); li.appendChild(b); ul.appendChild(li);
-      });
-      wrap.appendChild(ul);
-      if (items.length > 1) {
-        var all = document.createElement("button"); all.type = "button"; all.className = "btn sub"; all.style.marginTop = "8px"; all.textContent = "全部を、「" + meal + "」に、追加";
-        all.addEventListener("click", function () {
-          var d = dayOf(cur);
-          items.forEach(function (it) { d.items.push({ id: Date.now() + Math.floor(Math.random() * 100000), meal: meal, name: it.name, kcal: it.kcal }); });
-          save(KEY_D, days); box.innerHTML = ""; renderAll(); toast(items.length + "件を、追加しました");
-        });
-        wrap.appendChild(all);
-      }
-    }
-    if (res && res.caveat) { var c = document.createElement("div"); c.className = "pc"; c.textContent = res.caveat; wrap.appendChild(c); }
-    box.appendChild(wrap);
-  }
-  function showPhotoBtn() { $("photoBtn").style.display = (photo.url && photo.token) ? "block" : "none"; }
-  function setupPhoto() {
-    $("photoUrl").value = photo.url || ""; $("photoToken").value = photo.token || "";
-    showPhotoBtn();
-    $("photoSetBtn").addEventListener("click", function () {
-      photo = { url: $("photoUrl").value.trim(), token: $("photoToken").value.trim() };
-      if (photo.url && !/^https:\/\//.test(photo.url)) { toast("URLは、https:// で、始めてください"); return; }
-      save(KEY_P, photo); showPhotoBtn(); toast("写真の設定を、保存しました");
-    });
-    $("photoBtn").addEventListener("click", function () {
-      if (!photo.url || !photo.token) { photoMsg("先に、いちばん下の「写真でカロリーを調べる（設定）」に、サーバーのURLと、合言葉を、入れてください。"); return; }
-      photoMsg(""); $("photoFile").value = ""; $("photoFile").click();
-    });
-    $("photoFile").addEventListener("change", function () {
-      var f = this.files && this.files[0];
-      if (!f) return;
-      $("photoResult").innerHTML = ""; photoMsg("調べています…（数秒かかります）"); $("photoBtn").disabled = true;
-      resizeToJpeg(f, 1280).then(function (b64) {
-        return fetch(photo.url, { method: "POST", headers: { "Content-Type": "application/json", "X-App-Token": photo.token }, body: JSON.stringify({ image: b64, mediaType: "image/jpeg" }) });
-      }).then(function (r) {
-        return r.json().catch(function () { return null; }).then(function (data) {
-          if (!r.ok) throw new Error(r.status === 401 ? "合言葉が、違います（設定を、確かめてください）" : r.status === 413 ? "写真が、大きすぎます" : r.status === 429 ? "いま、混んでいます。少し待って、もう一度、お試しください" : (data && data.error) || "うまく、いきませんでした（" + r.status + "）");
-          return data;
-        });
-      }).then(function (res) {
-        photoMsg(""); renderPhotoResult(res);
-      }).catch(function (e) {
-        photoMsg((e && e.message && e.message !== "Failed to fetch") ? e.message : "サーバーに、つながりませんでした。URLと、電波を、確かめてください");
-      }).then(function () { $("photoBtn").disabled = false; });
-    });
-  }
-
   function init() {
     $("goalKcal").value = settings.goalKcal ? String(settings.goalKcal) : "";
     cur = cur || todayStr(); meal = meal || autoMeal();
@@ -714,6 +698,9 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
   $("shareBtn").addEventListener("click", shareBackup);
   $("copyBtn").addEventListener("click", function () { if (!hasData()) { toast("バックアップする記録がありません"); return; } copyText(backupText()); });
   $("restoreBtn").addEventListener("click", restore);
+  $("csvRestoreBtn").addEventListener("click", function () { $("csvFile").value = ""; $("csvFile").click(); });
+  $("csvFile").addEventListener("change", function () { if (this.files && this.files.length) readFiles(this.files); });
+  window.__applyCsvTexts = applyCsvTexts; window.__csvToDays = csvToDays;
   $("clearBtn").addEventListener("click", clearAll);
   ["name", "kcal", "goalKcal"].forEach(function (id) {
     $(id).addEventListener("focus", function () {
@@ -725,7 +712,6 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
     $(id).addEventListener("blur", function () { this.value = toHalf(this.value); });
   });
   setupMic();
-  setupPhoto();
   window.__parseSpeech = parseSpeech;   // 動作の確認用
   window.__csvText = csvText;
   init();
