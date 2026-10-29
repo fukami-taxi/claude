@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="日報テスト">
+<title>日報メモ（テスト版）</title>
+<style>
+:root {
+  --bg: #f4f6f8;
+  --card: #ffffff;
+  --text: #1c2430;
+  --muted: #6b7684;
+  --line: #d9dfe6;
+  --accent: #1f6feb;
+  --accent-text: #ffffff;
+  --danger: #c0392b;
+  --chip: #e8eef7;
+  --chip-on: #1f6feb;
+  --ok: #1a7f4b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161c;
+    --card: #1b222b;
+    --text: #e8edf3;
+    --muted: #93a0af;
+    --line: #2c3743;
+    --accent: #4c8dff;
+    --accent-text: #08111f;
+    --danger: #ff7b6b;
+    --chip: #263242;
+    --chip-on: #4c8dff;
+    --ok: #4cc38a;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif;
+  font-size: 17px;
+  line-height: 1.4;
+  padding: 12px 16px calc(24px + env(safe-area-inset-bottom));
+  max-width: 560px;
+  margin: 0 auto;
+}
+h1 { font-size: 20px; margin: 4px 0 12px; }
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+label { display: block; font-size: 14px; color: var(--muted); margin: 10px 0 6px; }
+label:first-child { margin-top: 0; }
+input[type=text], input[type=number], input[type=date], input[type=tel] {
+  width: 100%;
+  min-height: 48px;
+  font-size: 17px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+}
+.row { display: flex; gap: 8px; }
+.row > * { flex: 1; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.chip {
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: var(--chip);
+  color: var(--text);
+  font-size: 16px;
+}
+.chipgroup { display: inline-flex; gap: 4px; }
+.chipx { min-width: 44px; padding: 8px 10px; color: var(--danger); }
+.chip.on { background: var(--chip-on); color: var(--accent-text); border-color: var(--chip-on); }
+.num { min-width: 52px; flex: 0 0 auto; }
+button { font-family: inherit; }
+.btn {
+  min-height: 52px;
+  border-radius: 12px;
+  border: 0;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 10px 16px;
+  background: var(--accent);
+  color: var(--accent-text);
+  width: 100%;
+}
+.btn.sub { background: var(--chip); color: var(--text); font-weight: 600; }
+.btn.ghost { background: transparent; color: var(--danger); border: 1px solid var(--line); font-weight: 600; }
+.btn.now { min-height: 48px; width: auto; flex: 0 0 auto; padding: 8px 14px; font-size: 16px; }
+.list { list-style: none; margin: 0; padding: 0; }
+.list li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid var(--line);
+}
+.list li:last-child { border-bottom: 0; }
+.list .no { color: var(--muted); width: 28px; flex: 0 0 auto; }
+.list .body { flex: 1; min-width: 0; font-size: 16px; }
+.list .sub { color: var(--muted); font-size: 14px; }
+.list .edit { flex: 0 0 auto; min-width: 44px; min-height: 44px; border: 1px solid var(--line); background: transparent; color: var(--accent); border-radius: 10px; font-size: 16px; }
+.list li.editing { background: var(--chip); border-radius: 10px; }
+.list .del { flex: 0 0 auto; min-width: 44px; min-height: 44px; border: 1px solid var(--line); background: transparent; color: var(--danger); border-radius: 10px; font-size: 16px; }
+textarea {
+  width: 100%; min-height: 150px; font-size: 16px; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text);
+  font-family: ui-monospace, Menlo, monospace;
+}
+.sum { display: flex; justify-content: space-between; font-size: 16px; margin-bottom: 8px; }
+.toast { color: var(--ok); min-height: 22px; margin-top: 8px; font-size: 15px; }
+.hint { color: var(--muted); font-size: 14px; margin-top: 8px; }
+.stack > * + * { margin-top: 10px; }
+</style>
+</head>
+<body>
+<div style="background:#e67e22;color:#fff;font-weight:700;padding:10px 12px;border-radius:10px;margin:4px 0 12px;font-size:15px">テスト版です。ここに書いた記録は、本番の記録とは、別です。Excelには、入りません。</div>
+<h1>日報メモ（テスト版）</h1>
+
+<div class="card">
+  <label for="date">日付</label>
+  <input type="date" id="date">
+  <div class="hint" id="dateJp" style="font-size:16px;color:var(--text);margin-top:8px"></div>
+</div>
+
+<div class="card">
+  <div id="editNote" style="display:none;font-weight:700;color:var(--accent);margin-bottom:8px"></div>
+  <label>人数</label>
+  <div class="chips" id="people"></div>
+
+  <label for="from">乗車地</label>
+  <input type="text" id="from" list="places" autocomplete="off">
+  <div class="chips" id="fromChips"></div>
+
+  <label for="to">降車地</label>
+  <input type="text" id="to" list="places" autocomplete="off">
+  <div class="chips" id="toChips"></div>
+
+  <label for="time">降車時刻（4桁）</label>
+  <div class="row">
+    <input type="tel" id="time" inputmode="numeric" maxlength="4">
+    <button class="btn sub now" id="nowBtn" type="button">いま</button>
+  </div>
+
+  <label for="fare">料金（円）</label>
+  <input type="tel" id="fare" inputmode="numeric">
+
+  <label>支払い方法（なくてもOK）</label>
+  <div class="chips" id="pays"></div>
+
+  <label for="toll">高速代（円）（なければ、空のまま）</label>
+  <input type="tel" id="toll" inputmode="numeric">
+
+  <label for="tollBack">帰り高速代（円）（なければ、空のまま）</label>
+  <input type="tel" id="tollBack" inputmode="numeric">
+
+  <label>備考（なくてもOK）</label>
+  <div class="chips" id="notes" style="display:none"></div>
+  <input type="text" id="note" autocomplete="off" style="margin-top:8px">
+
+  <div style="margin-top:14px"><button class="btn" id="addBtn" type="button">追加</button></div>
+  <div style="margin-top:8px"><button class="btn sub" id="cancelEditBtn" type="button" style="display:none">直すのを、やめる</button></div>
+  <div class="toast" id="toast" role="status"></div>
+</div>
+
+<div class="card">
+  <div class="sum"><strong id="count">0件</strong><span id="total">合計 0円</span></div>
+  <ul class="list" id="list"></ul>
+  <div class="hint" id="emptyHint">まだ記録がありません。</div>
+</div>
+
+<div class="card">
+  <label style="margin:0 0 8px">たまっている日（タップで、その日を表示）</label>
+  <ul class="list" id="dayList"></ul>
+  <div class="hint" id="dayEmpty">まだ、たまっている日はありません。</div>
+</div>
+
+<div class="card stack">
+  <label style="margin:0">出力する範囲</label>
+  <div class="chips" id="scope">
+    <button type="button" class="chip" data-scope="day">この日だけ</button>
+    <button type="button" class="chip" data-scope="unsent">未送信を全部</button>
+    <button type="button" class="chip" data-scope="all">全部の日</button>
+  </div>
+  <label for="out" style="margin:0">日報用テキスト</label>
+  <textarea id="out"></textarea>
+  <button class="btn sub" id="resetBtn" type="button">直した文を、もとに戻す</button>
+  <button class="btn" id="copyBtn" type="button">コピー</button>
+  <button class="btn sub" id="shareBtn" type="button">共有（AirDrop・メッセージなど）</button>
+  <button class="btn sub" id="sentBtn" type="button">送信済みにする</button>
+  <button class="btn ghost" id="clearBtn" type="button">この日の記録を全部消す</button>
+  <div class="hint">日報用テキストは、文字を直せます。直した文は、コピーや共有に、そのまま使われます（記録を、足したり消したり、日や範囲を、切り替えると、直した文は、消えて、もとの文になります）。入力した内容は、このiPhoneの中にだけ保存されます。</div>
+</div>
+
+<datalist id="places"></datalist>
+
+<script>
+(function () {
+  "use strict";
+  var KEY_DAYS = "nippo-test.days.v1";
+  var KEY_PLACES = "nippo-test.places.v1";
+  var KEY_SENT = "nippo-test.sent.v1";
+  var KEY_SCOPE = "nippo-test.scope.v1";
+  var NOTE_PRESETS = [];
+  var PAY_METHODS = ["現金", "チケット", "クレチケ", "クレジット", "QR決済", "GOPAY", "電子決済", "楽天"];
+  var DEFAULT_PLACES = [];
+  // 乗車地のボタンは、この3つだけ（毎回、同じ。覚えた場所は、出さない）
+  var FROM_FIXED = ["銀座", "新橋", "霞ヶ関"];
+  // 降車地のボタン：この7つは、いつも出る。そのあとに、最近、使った場所が、出る
+  var TO_FIXED = ["横浜", "川崎", "船橋", "千葉", "松戸", "浦和", "大宮"];
+
+  function load(key, fallback) {
+    try { var v = window.localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+    catch (e) { return fallback; }
+  }
+  function save(key, value) {
+    try { window.localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* storage unavailable */ }
+  }
+  var $ = function (id) { return document.getElementById(id); };
+
+  var days = load(KEY_DAYS, {});
+  var places = load(KEY_PLACES, DEFAULT_PLACES);
+  var sent = load(KEY_SENT, {});
+  var scope = load(KEY_SCOPE, "day");
+  var people = 1;
+  var editIndex = null;   // 直している記録の、番号（0から）。直していないときは null
+  var editDate = null;    // 直している記録の、日付
+  var selectedNotes = {};
+  var selectedPay = "";
+
+  function todayStr() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var dd = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + dd;
+  }
+  // 日付は、令和の年で出す（例：8年10月25日。「令和」の文字は、付けない）。2018年より前は、西暦のまま
+  function dayLabel(iso) {
+    var p = iso.split("-");
+    var y = parseInt(p[0], 10), r = y - 2018;
+    return (r >= 1 ? r : y) + "年" + parseInt(p[1], 10) + "月" + parseInt(p[2], 10) + "日";
+  }
+  function dayJp(iso) {
+    var p = iso.split("-");
+    var w = ["日", "月", "火", "水", "木", "金", "土"][new Date(+p[0], p[1] - 1, +p[2]).getDay()];
+    return dayLabel(iso) + "（" + w + "）";
+  }
+  function nowHHMM() {
+    var d = new Date();
+    return String(d.getHours()).padStart(2, "0") + String(d.getMinutes()).padStart(2, "0");
+  }
+  // 全角の数字（１４３５）や、全角の記号（：，）を、半角に直す
+  function toHalf(v) {
+    return String(v || "")
+      .replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); })
+      .replace(/[：]/g, ":").replace(/[，]/g, ",");
+  }
+  function normTime(v) {
+    var s = toHalf(v).replace(/[^0-9]/g, "");
+    if (s.length === 3) s = "0" + s;
+    return s.length === 4 ? s : "";
+  }
+  function toast(msg) {
+    $("toast").textContent = msg;
+    window.clearTimeout(toast.t);
+    toast.t = window.setTimeout(function () { $("toast").textContent = ""; }, 2500);
+  }
+  function currentTrips() {
+    var k = $("date").value;
+    if (!days[k]) days[k] = [];
+    return days[k];
+  }
+
+  function rememberPlace(name) {
+    name = (name || "").trim();
+    if (!name) return;
+    places = places.filter(function (p) { return p !== name; });
+    places.unshift(name);
+    places = places.slice(0, 40);
+    save(KEY_PLACES, places);
+  }
+
+  function renderPeople() {
+    var box = $("people");
+    box.innerHTML = "";
+    for (var i = 1; i <= 5; i++) {
+      (function (n) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "chip num" + (people === n ? " on" : "");
+        b.textContent = n + "人";
+        b.addEventListener("click", function () { people = n; renderPeople(); });
+        box.appendChild(b);
+      })(i);
+    }
+  }
+  // 使った場所のボタン：いつも出る、ボタンの場所（銀座、横浜、など）は、ここには、出さない
+  function recentPlaces() {
+    var fixed = FROM_FIXED.concat(TO_FIXED);
+    return places.filter(function (p) { return fixed.indexOf(p) < 0; }).slice(0, 5);
+  }
+  function makeChip(p, inputId, deletable) {
+    var wrap = document.createElement("span");
+    wrap.className = "chipgroup";
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip";
+    b.textContent = p;
+    b.addEventListener("click", function () { $(inputId).value = p; });
+    wrap.appendChild(b);
+    if (deletable) {
+      var x = document.createElement("button");
+      x.type = "button";
+      x.className = "chip chipx";
+      x.textContent = "×";
+      x.setAttribute("aria-label", p + "を、ボタンから消す");
+      x.addEventListener("click", function () {
+        places = places.filter(function (q) { return q !== p; });
+        save(KEY_PLACES, places);
+        renderPlaces();
+      });
+      wrap.appendChild(x);
+    }
+    return wrap;
+  }
+  // fixed = いつも出るボタン、recent = 使った場所（×で消せる）
+  function renderChips(boxId, inputId, fixed, recent) {
+    var box = $(boxId);
+    box.innerHTML = "";
+    fixed.forEach(function (p) { box.appendChild(makeChip(p, inputId, false)); });
+    recent.forEach(function (p) { box.appendChild(makeChip(p, inputId, true)); });
+  }
+  function renderPay() {
+    var box = $("pays");
+    box.innerHTML = "";
+    PAY_METHODS.forEach(function (n) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip" + (selectedPay === n ? " on" : "");
+      b.textContent = n;
+      b.addEventListener("click", function () { selectedPay = (selectedPay === n) ? "" : n; renderPay(); });
+      box.appendChild(b);
+    });
+  }
+  function renderNotes() {
+    var box = $("notes");
+    box.innerHTML = "";
+    NOTE_PRESETS.forEach(function (n) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip" + (selectedNotes[n] ? " on" : "");
+      b.textContent = n;
+      b.addEventListener("click", function () { selectedNotes[n] = !selectedNotes[n]; renderNotes(); });
+      box.appendChild(b);
+    });
+  }
+  function renderPlaces() {
+    var dl = $("places");
+    dl.innerHTML = "";
+    places.forEach(function (p) {
+      var o = document.createElement("option");
+      o.value = p;
+      dl.appendChild(o);
+    });
+    renderChips("fromChips", "from", FROM_FIXED, recentPlaces());
+    renderChips("toChips", "to", TO_FIXED, recentPlaces());
+  }
+
+  function lineOf(t) {
+    var parts = [String(t.people), t.from, t.to, t.time, String(t.fare)];
+    if (t.pay) parts.push(t.pay);
+    if (t.toll) parts.push("高速" + t.toll);
+    if (t.tollBack) parts.push("帰り高速" + t.tollBack);
+    if (t.note) parts.push(t.note);
+    return parts.join(" ");
+  }
+  function renderList() {
+    var trips = currentTrips();
+    var ul = $("list");
+    ul.innerHTML = "";
+    var total = 0;
+    trips.forEach(function (t, i) {
+      total += t.fare;
+      var li = document.createElement("li");
+      var no = document.createElement("span"); no.className = "no"; no.textContent = String(i + 1);
+      var body = document.createElement("span"); body.className = "body";
+      body.textContent = t.people + "人 " + t.from + " → " + t.to;
+      var sub = document.createElement("div"); sub.className = "sub";
+      sub.textContent = t.time + " / " + t.fare + "円" + (t.pay ? " / " + t.pay : "") + (t.toll ? " / 高速" + t.toll + "円" : "") + (t.tollBack ? " / 帰り高速" + t.tollBack + "円" : "") + (t.note ? " / " + t.note : "");
+      body.appendChild(sub);
+      var del = document.createElement("button"); del.className = "del"; del.type = "button"; del.textContent = "削除";
+      del.addEventListener("click", function () {
+        if (editIndex !== null) { endEdit(); clearForm(); }
+        trips.splice(i, 1); delete sent[$("date").value]; save(KEY_SENT, sent); save(KEY_DAYS, days); renderAll();
+      });
+      var edit = document.createElement("button"); edit.className = "edit"; edit.type = "button"; edit.textContent = "編集";
+      edit.addEventListener("click", function () { startEdit(i, t); renderList(); window.scrollTo(0, 0); });
+      if (editIndex === i && editDate === $("date").value) li.className = "editing";
+      li.appendChild(no); li.appendChild(body); li.appendChild(edit); li.appendChild(del);
+      ul.appendChild(li);
+    });
+    $("dateJp").textContent = dayJp($("date").value);
+    $("count").textContent = trips.length + "件";
+    $("total").textContent = "合計 " + total.toLocaleString("ja-JP") + "円";
+    $("emptyHint").style.display = trips.length ? "none" : "block";
+    renderDays();
+    $("out").value = buildText();
+    var chips = document.querySelectorAll("#scope .chip");
+    for (var c = 0; c < chips.length; c++) {
+      chips[c].className = "chip" + (chips[c].getAttribute("data-scope") === scope ? " on" : "");
+    }
+    $("sentBtn").textContent = scope === "unsent" ? "未送信の日を、全部、送信済みにする"
+      : scope === "all" ? "全部の日を、送信済みにする" : "この日を、送信済みにする";
+  }
+  function daysWithTrips() {
+    return Object.keys(days).filter(function (k) { return days[k] && days[k].length; }).sort();
+  }
+  function textOfDay(k) {
+    var lines = ["日付 " + dayLabel(k), ""];
+    days[k].forEach(function (t) { lines.push(lineOf(t)); });
+    return lines.join("\n");
+  }
+  function targetDays() {
+    if (scope === "all") return daysWithTrips();
+    if (scope === "unsent") return daysWithTrips().filter(function (k) { return !sent[k]; });
+    var k = $("date").value;
+    return days[k] && days[k].length ? [k] : [];
+  }
+  function buildText() {
+    var t = targetDays().map(textOfDay).join("\n\n");
+    return t ? "【テスト版】この文章は、本番の取り込みには、入りません\n\n" + t : t;
+  }
+  function renderDays() {
+    var ul = $("dayList");
+    ul.innerHTML = "";
+    var ks = daysWithTrips().reverse();
+    ks.forEach(function (k) {
+      var li = document.createElement("li");
+      var body = document.createElement("span"); body.className = "body";
+      body.textContent = dayLabel(k) + "  " + days[k].length + "件";
+      var tag = document.createElement("span"); tag.className = "sub";
+      tag.textContent = sent[k] ? "送信済み" : "未送信";
+      body.appendChild(document.createElement("br")); body.appendChild(tag);
+      var go = document.createElement("button"); go.className = "del"; go.type = "button"; go.textContent = "開く";
+      go.style.color = "var(--accent)";
+      go.addEventListener("click", function () { if (editIndex !== null) { endEdit(); clearForm(); } $("date").value = k; renderAll(); window.scrollTo(0, 0); });
+      li.appendChild(body); li.appendChild(go);
+      ul.appendChild(li);
+    });
+    $("dayEmpty").style.display = ks.length ? "none" : "block";
+  }
+  function renderAll() { renderPlaces(); renderList(); }
+
+  function clearForm() {
+    $("from").value = "";
+    $("to").value = "";
+    $("time").value = "";
+    $("fare").value = "";
+    $("note").value = "";
+    $("toll").value = "";
+    $("tollBack").value = "";
+    selectedNotes = {};
+    selectedPay = "";
+    people = 1;
+    renderPeople(); renderPay(); renderNotes();
+  }
+  function startEdit(i, t) {
+    people = t.people; renderPeople();
+    $("from").value = t.from; $("to").value = t.to; $("time").value = t.time; $("fare").value = String(t.fare);
+    selectedPay = t.pay || ""; renderPay();
+    $("toll").value = t.toll ? String(t.toll) : ""; $("tollBack").value = t.tollBack ? String(t.tollBack) : "";
+    selectedNotes = {}; renderNotes(); $("note").value = t.note || "";
+    editIndex = i; editDate = $("date").value;
+    $("addBtn").textContent = "直して保存";
+    $("cancelEditBtn").style.display = "block";
+    $("editNote").style.display = "block";
+    $("editNote").textContent = "いま、" + (i + 1) + "件目を、直しています";
+  }
+  function endEdit() {
+    editIndex = null; editDate = null;
+    $("addBtn").textContent = "追加";
+    $("cancelEditBtn").style.display = "none";
+    $("editNote").style.display = "none";
+  }
+  function addTrip() {
+    var from = $("from").value.trim();
+    var to = $("to").value.trim();
+    var time = normTime($("time").value);
+    var fareRaw = toHalf($("fare").value).replace(/[^0-9]/g, "");
+    if (!from || !to) { toast("乗車地と降車地を入れてください"); return; }
+    if (!time) { toast("降車時刻を4桁で入れてください（例 1435）"); return; }
+    if (!fareRaw) { toast("料金を入れてください"); return; }
+    var toll = parseInt(toHalf($("toll").value).replace(/[^0-9]/g, ""), 10) || 0;
+    var tollBack = parseInt(toHalf($("tollBack").value).replace(/[^0-9]/g, ""), 10) || 0;
+    var notes = NOTE_PRESETS.filter(function (n) { return selectedNotes[n]; });
+    var extra = $("note").value.trim();
+    if (extra) notes.push(extra);
+    var trip = { people: people, from: from, to: to, time: time, fare: parseInt(fareRaw, 10), pay: selectedPay, toll: toll, tollBack: tollBack, note: notes.join(" ") };
+    var wasEdit = (editIndex !== null && editDate === $("date").value && editIndex < currentTrips().length);
+    var doneMsg = null;
+    if (wasEdit) { currentTrips()[editIndex] = trip; doneMsg = (editIndex + 1) + "件目を、直しました"; }
+    else { currentTrips().push(trip); }
+    delete sent[$("date").value]; save(KEY_SENT, sent);
+    rememberPlace(from); rememberPlace(to);
+    save(KEY_DAYS, days);
+    // 追加したあと（直したあと）は、全部の欄を、空にする（乗車地も）
+    endEdit(); clearForm(); renderAll();
+    toast(doneMsg || (currentTrips().length + "件目を追加しました"));
+  }
+
+  function copyText() {
+    var text = $("out").value;
+    if (!text) { toast("コピーする記録がありません"); return; }
+    function fallback() {
+      var ta = $("out"); ta.focus(); ta.select();
+      ta.setSelectionRange(0, text.length);
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      toast(ok ? "コピーしました" : "コピーできませんでした。文字を長押ししてコピーしてください");
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { toast("コピーしました"); }, fallback);
+    } else { fallback(); }
+  }
+  function shareText() {
+    var text = $("out").value;
+    if (!text) { toast("共有する記録がありません"); return; }
+    if (navigator.share) {
+      navigator.share({ title: "日報 " + dayLabel($("date").value), text: text }).catch(function () { /* cancelled */ });
+    } else { copyText(); }
+  }
+  function clearDay() {
+    if (!currentTrips().length) return;
+    if (window.confirm(dayLabel($("date").value) + " の記録を、全部消します。よろしいですか？")) {
+      if (editIndex !== null) { endEdit(); clearForm(); }
+      days[$("date").value] = [];
+      save(KEY_DAYS, days);
+      renderAll();
+      toast("消しました");
+    }
+  }
+
+  $("date").value = todayStr();
+  $("date").addEventListener("change", function () {
+    if (editIndex !== null) { endEdit(); clearForm(); toast("日を変えたので、直すのを、やめました"); }
+    renderList();
+  });
+  $("cancelEditBtn").addEventListener("click", function () { endEdit(); clearForm(); renderList(); toast("直すのを、やめました"); });
+  $("addBtn").addEventListener("click", addTrip);
+  $("copyBtn").addEventListener("click", copyText);
+  $("resetBtn").addEventListener("click", function () { $("out").value = buildText(); toast("もとの文に戻しました"); });
+  $("shareBtn").addEventListener("click", shareText);
+  $("clearBtn").addEventListener("click", clearDay);
+  $("sentBtn").addEventListener("click", function () {
+    var ks = targetDays();
+    if (!ks.length) { toast("対象の記録がありません"); return; }
+    ks.forEach(function (k) { sent[k] = true; });
+    save(KEY_SENT, sent);
+    renderAll();
+    toast(ks.length + "日分を、送信済みにしました");
+  });
+  var scopeChips = document.querySelectorAll("#scope .chip");
+  for (var i = 0; i < scopeChips.length; i++) {
+    scopeChips[i].addEventListener("click", function () {
+      scope = this.getAttribute("data-scope"); save(KEY_SCOPE, scope); renderAll();
+    });
+  }
+  $("nowBtn").addEventListener("click", function () { $("time").value = nowHHMM(); });
+  // 時刻と料金は、全角で、打っても、欄を出るときに、半角に直す
+  ["time", "fare", "toll", "tollBack"].forEach(function (id) {
+    $(id).addEventListener("blur", function () { this.value = toHalf(this.value); });
+  });
+  // 欄を押したら、中の文字を、全部、選ぶ（消さなくても、そのまま、打てば、置き換わる）
+  ["from", "to", "time", "fare", "toll", "tollBack", "note"].forEach(function (id) {
+    var el = $(id);
+    el.addEventListener("focus", function () {
+      window.setTimeout(function () { try { el.select(); el.setSelectionRange(0, 9999); } catch (e) { /* ignore */ } }, 0);
+    });
+  });
+  renderPeople(); renderPay(); renderNotes(); renderAll();
+})();
+</script>
+</body>
+</html>
