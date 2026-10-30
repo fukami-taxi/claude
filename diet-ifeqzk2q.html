@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<meta name="app-version" content="2026-10-30-7">
+<meta name="app-version" content="2026-10-31-2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="音声ダイエットメモ">
 <title>音声ダイエットメモ</title>
@@ -216,6 +216,10 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
   <button class="btn sub" id="csvRestoreBtn" type="button">CSVのファイルから、もどす（Dropboxなどから、選ぶ）</button>
   <input type="file" id="csvFile" accept=".csv,text/csv,text/plain,text/comma-separated-values" multiple style="display:none">
   <div class="hint">ファイルを選ぶ画面が、iPhoneの中の、ファイルを、出したときは、画面の下の「<b>ブラウズ</b>」→「<b>Dropbox</b>」→「<b>ダイエット</b>」の順に、開いてください。Dropboxが、出ないときは、「ブラウズ」の画面で、右上の「…」→「編集」から、Dropboxを、オンにします。どうしても、選べないときは、DropboxのアプリでCSVを開き、文字を全部コピーして、上の「もどす」の欄に、貼り付けても、もどせます。</div>
+  <button class="btn sub" id="syncBtn" type="button" style="margin-top:6px">全記録CSVに、そろえる（アプリの記録を、CSVと、同じにする）</button>
+  <input type="file" id="syncFile" accept=".csv,text/csv,text/plain,text/comma-separated-values" style="display:none">
+  <button class="btn ghost" id="undoSyncBtn" type="button" style="display:none;color:var(--text)"></button>
+  <div class="hint">CSVの行を、消して、直した、あとに、使います。アプリにあって、CSVにない日は、<b>アプリからも、消えます</b>（押す前に、確認が、出ます。間違えたときは、直後に、「元に戻す」が、できます）。</div>
   <label for="backupDays" style="margin-top:14px">保存のお知らせ：何日、保存しないと、出すか（0にすると、出しません）</label>
   <input type="tel" id="backupDays" inputmode="numeric" autocomplete="off">
   <button class="btn ghost" id="clearBtn" type="button">全部の記録を消す</button>
@@ -564,8 +568,11 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
     if (!hasData()) { toast("表にする記録がありません"); return; }
     var text = "\ufeff" + csvText();   // 先頭の印（BOM）：Excelで、日本語が、文字化けしない
     // 名前に、時刻も入れる：同じ日に、何度、保存しても、前のCSVを、上書きしない（記録が、減ったあとの、CSVで、古いCSVが、消えるのを、防ぐ）
-    var nowD = new Date(), hhmmss = pad(nowD.getHours()) + pad(nowD.getMinutes()) + pad(nowD.getSeconds());
-    var name = "ダイエット_" + todayStr() + "_" + hhmmss + ".csv";
+    // 名前は「ダイエット記録_年-月-日_時分.csv」：名前の順に、並べると、日付の順になる。同じ分に、2回、保存したときだけ、秒を足す
+    var nowD = new Date(), stamp = todayStr() + "_" + pad(nowD.getHours()) + pad(nowD.getMinutes());
+    shareCsv.counts = shareCsv.counts || {};
+    var nth = (shareCsv.counts[stamp] = (shareCsv.counts[stamp] || 0) + 1);   // 同じ分に、2回目、3回目：「_2」「_3」を、足す
+    var name = "ダイエット記録_" + stamp + (nth > 1 ? "_" + nth : "") + ".csv";
     try {
       var file = new File([text], name, { type: "text/csv" });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -645,6 +652,52 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
     save(KEY_D, days); init(); toast(keys.length + "日分を、もどしました");
     return true;
   }
+  // ---- 全記録CSVに、そろえる：アプリの記録を、CSVの内容と、同じにする（CSVにない日は、アプリからも、消える）。1回だけ、元に戻せる ----
+  var KEY_U = "rec.undo.v1";
+  function hasDay(d) { return d && ((d.items || []).length || typeof d.w === "number"); }
+  function renderUndo() {
+    var u = load(KEY_U, null), b = $("undoSyncBtn");
+    if (u && u.days) {
+      var d = new Date(u.at);
+      b.textContent = "さっきの「そろえる」を、元に戻す（" + (d.getMonth() + 1) + "月" + d.getDate() + "日 " + pad(d.getHours()) + ":" + pad(d.getMinutes()) + " より前の、記録）";
+      b.style.display = "block";
+    } else b.style.display = "none";
+  }
+  function applySync(text, label) {
+    var r = csvToDays(text);
+    if (r.error) { toast((label ? label + "：" : "") + r.error); return false; }
+    var inKeys = Object.keys(r.days).filter(function (k) { return r.days[k].items.length || typeof r.days[k].w === "number"; });
+    if (!inKeys.length) { toast("CSVに、記録が、ありません。（空のCSVで、アプリの記録を、消さないように、止めました）"); return false; }
+    var appKeys = Object.keys(days).filter(function (k) { return hasDay(days[k]); });
+    var onlyApp = appKeys.filter(function (k) { return inKeys.indexOf(k) < 0; });
+    var onlyCsv = inKeys.filter(function (k) { return appKeys.indexOf(k) < 0; });
+    var both = inKeys.filter(function (k) { return appKeys.indexOf(k) >= 0; });
+    var msg = (label || "CSV") + "の内容に、アプリの記録を、そろえます。\n"
+      + "・アプリにあって、CSVにない日：" + onlyApp.length + "日（アプリから、消えます）\n"
+      + "・CSVにあって、アプリにない日：" + onlyCsv.length + "日（増えます）\n"
+      + "・両方にある日：" + both.length + "日（CSVの内容に、なります）\n\n"
+      + "間違えたときは、このあと、「元に戻す」が、できます。よろしいですか？";
+    if (!window.confirm(msg)) return false;
+    save(KEY_U, { at: new Date().toISOString(), days: JSON.parse(JSON.stringify(days)) });
+    var next = {};
+    inKeys.forEach(function (k) {
+      var d = { items: r.days[k].items };
+      if (typeof r.days[k].w === "number") d.w = r.days[k].w;
+      next[k] = d;
+    });
+    days = next; save(KEY_D, days); init(); renderUndo();
+    toast("CSVと、同じにしました（消えた日：" + onlyApp.length + "日、増えた日：" + onlyCsv.length + "日）");
+    return true;
+  }
+  function undoSync() {
+    var u = load(KEY_U, null);
+    if (!u || !u.days) { toast("元に戻せる、記録が、ありません"); return; }
+    if (!window.confirm("「そろえる」を、する前の、記録に、戻します。いまの、アプリの記録は、置き換わります。よろしいですか？")) return;
+    days = u.days; save(KEY_D, days);
+    try { window.localStorage.removeItem(KEY_U); } catch (e) { /* ignore */ }
+    init(); renderUndo(); toast("「そろえる」の前の、記録に、戻しました");
+  }
+  window.__applySync = applySync; window.__undoSync = undoSync;
   function readFiles(files) {
     var list = Array.prototype.slice.call(files).sort(function (a, b) {
       var da = (a.name.match(/\d{4}-\d{2}-\d{2}/) || [""])[0], db = (b.name.match(/\d{4}-\d{2}-\d{2}/) || [""])[0];
@@ -762,6 +815,15 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
   $("shareBtn").addEventListener("click", shareBackup);
   $("copyBtn").addEventListener("click", function () { if (!hasData()) { toast("バックアップする記録がありません"); return; } copyText(backupText(), markBackup); });
   $("restoreBtn").addEventListener("click", restore);
+  $("syncBtn").addEventListener("click", function () { $("syncFile").value = ""; $("syncFile").click(); });
+  $("syncFile").addEventListener("change", function () {
+    var f = this.files && this.files[0]; if (!f) return;
+    var fr = new FileReader();
+    fr.onload = function () { applySync(String(fr.result), "「" + f.name + "」"); };
+    fr.onerror = function () { toast("ファイルを、読み込めませんでした"); };
+    fr.readAsText(f, "utf-8");
+  });
+  $("undoSyncBtn").addEventListener("click", undoSync);
   $("backupNowBtn").addEventListener("click", shareCsv);
   $("backupLaterBtn").addEventListener("click", function () { bk.snooze = todayStr(); save(KEY_B, bk); renderBanner(); });
   $("backupDays").addEventListener("change", function () {
@@ -806,6 +868,7 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
   }
   window.__checkUpdate = checkUpdate;
   if (window.fetch && /^https?:/.test(location.protocol)) checkUpdate(function (u, o) { return window.fetch(u, o); }, function (u) { location.replace(u); });
+  renderUndo();
   window.addEventListener("scroll", updateStickyBar, { passive: true });
   window.addEventListener("resize", updateStickyBar);
   init();
