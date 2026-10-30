@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<meta name="app-version" content="2026-10-30-4">
+<meta name="app-version" content="2026-10-30-5">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="音声ダイエットメモ">
 <title>音声ダイエットメモ</title>
@@ -528,7 +528,9 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
   function shareCsv() {
     if (!hasData()) { toast("表にする記録がありません"); return; }
     var text = "\ufeff" + csvText();   // 先頭の印（BOM）：Excelで、日本語が、文字化けしない
-    var name = "ダイエット_" + todayStr() + ".csv";
+    // 名前に、時刻も入れる：同じ日に、何度、保存しても、前のCSVを、上書きしない（記録が、減ったあとの、CSVで、古いCSVが、消えるのを、防ぐ）
+    var nowD = new Date(), hhmmss = pad(nowD.getHours()) + pad(nowD.getMinutes()) + pad(nowD.getSeconds());
+    var name = "ダイエット_" + todayStr() + "_" + hhmmss + ".csv";
     try {
       var file = new File([text], name, { type: "text/csv" });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
