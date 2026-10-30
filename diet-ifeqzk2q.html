@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<meta name="app-version" content="2026-10-30-5">
+<meta name="app-version" content="2026-10-30-7">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="音声ダイエットメモ">
 <title>音声ダイエットメモ</title>
@@ -49,6 +49,19 @@ body {
   max-width: 560px;
   margin: 0 auto;
 }
+/* 画面を、下に、動かしたときだけ、上に、出る、細い帯（その日の、合計・目標・あと・％） */
+#stickyBar { position: fixed; top: 0; left: 0; right: 0; max-width: 560px; margin: 0 auto; z-index: 40; display: none;
+  background: var(--card); border-bottom: 1px solid var(--line); box-shadow: 0 2px 10px rgba(0,0,0,.15);
+  padding: calc(8px + env(safe-area-inset-top)) 14px 0; border-radius: 0 0 14px 14px; }
+#stickyBar .sbrow { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+#stickyBar .sbmain { font-size: 21px; font-weight: 800; white-space: nowrap; }
+#stickyBar .sbrest { font-size: 16px; font-weight: 800; text-align: right; white-space: nowrap; }
+#stickyBar .sbsub { font-size: 13px; color: var(--muted); margin-top: 2px; align-items: center; }
+#stickyBar .sbrest.over { color: var(--over); }
+#stickyBar .sbrest.ok { color: var(--accent); }
+#stickyBar .sbday { font-size: 17px; font-weight: 800; color: var(--text); white-space: nowrap; }
+#stickyBar .sbbar { height: 4px; background: var(--line); margin: 6px -14px 0; overflow: hidden; border-radius: 0 0 14px 14px; }
+#stickyBar .sbbar i { display: block; height: 100%; width: 0; background: var(--accent); }
 .top { background: var(--accent); color: var(--accent-text); padding: 14px 16px 18px; border-radius: 0 0 22px 22px; }
 .top h1 { font-size: 16px; margin: 0 0 8px; font-weight: 600; opacity: .9; }
 .datebar { display: flex; align-items: center; gap: 8px; }
@@ -111,6 +124,12 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
 </style>
 </head>
 <body>
+<div id="stickyBar" aria-live="off">
+  <div class="sbrow"><div class="sbmain" id="sbTotal">0</div><div class="sbrest" id="sbRest"></div></div>
+  <div class="sbrow sbsub"><span id="sbGoal"></span><span class="sbday" id="sbDay"></span></div>
+  <div class="sbbar"><i id="sbFill"></i></div>
+</div>
+
 <div class="top">
   <h1>音声ダイエットメモ</h1>
   <div class="datebar">
@@ -129,7 +148,7 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
   <div class="row" style="margin-top:10px"><button class="btn" id="backupNowBtn" type="button">今、保存する</button><button class="btn sub" id="backupLaterBtn" type="button">あとで</button></div>
 </div>
 
-<div class="card">
+<div class="card" id="ringCard">
   <div class="ring">
     <svg viewBox="0 0 120 120" id="ringSvg" role="img" aria-label="きょうの合計カロリー"></svg>
     <div>
@@ -284,6 +303,22 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
     if (!g) { rest.textContent = ""; rest.className = "rest"; }
     else if (t > g) { rest.textContent = num(t - g) + " kcal オーバー"; rest.className = "rest over"; }
     else { rest.textContent = "あと " + num(g - t) + " kcal"; rest.className = "rest ok"; }
+    // 上に、出る、細い帯にも、同じ内容を、入れる（見ている日の分だけ）
+    $("sbTotal").textContent = num(t) + " kcal";
+    $("sbGoal").textContent = g ? "目標 " + num(g) + " kcal　" + Math.round(t / g * 100) + "%" : "目標は、まだ、ありません";
+    var sbr = $("sbRest");
+    if (!g) { sbr.textContent = ""; sbr.className = "sbrest"; }
+    else if (t > g) { sbr.textContent = num(t - g) + " kcal オーバー"; sbr.className = "sbrest over"; }
+    else { sbr.textContent = "あと " + num(g - t) + " kcal"; sbr.className = "sbrest ok"; }
+    $("sbDay").textContent = dayJp(cur).replace("（", " (").replace("）", ")");
+    var fill = $("sbFill"); fill.style.width = (frac * 100).toFixed(1) + "%"; fill.style.background = color;
+    updateStickyBar();
+  }
+  // 合計の、カードが、画面の上に、消えたら、細い帯を、出す
+  function updateStickyBar() {
+    var card = $("ringCard"), bar = $("stickyBar");
+    if (!card || !bar) return;
+    bar.style.display = card.getBoundingClientRect().bottom < 6 ? "block" : "none";
   }
 
   function renderMeals() {
@@ -771,7 +806,10 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
   }
   window.__checkUpdate = checkUpdate;
   if (window.fetch && /^https?:/.test(location.protocol)) checkUpdate(function (u, o) { return window.fetch(u, o); }, function (u) { location.replace(u); });
+  window.addEventListener("scroll", updateStickyBar, { passive: true });
+  window.addEventListener("resize", updateStickyBar);
   init();
+  updateStickyBar();
 })();
 </script>
 </body>
