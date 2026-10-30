@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<meta name="app-version" content="2026-10-31-2">
+<meta name="app-version" content="2026-10-31-3">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="音声ダイエットメモ">
 <title>音声ダイエットメモ</title>
@@ -227,6 +227,8 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
 </div>
 
 </div>
+
+<div class="hint" id="verLabel" style="text-align:center;margin:6px 0 24px"></div>
 
 <script>
 (function () {
@@ -698,6 +700,7 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
     init(); renderUndo(); toast("「そろえる」の前の、記録に、戻しました");
   }
   window.__applySync = applySync; window.__undoSync = undoSync;
+  (function () { var m = document.querySelector('meta[name="app-version"]'); if (m && $("verLabel")) $("verLabel").textContent = "画面の版：" + m.getAttribute("content"); })();
   function readFiles(files) {
     var list = Array.prototype.slice.call(files).sort(function (a, b) {
       var da = (a.name.match(/\d{4}-\d{2}-\d{2}/) || [""])[0], db = (b.name.match(/\d{4}-\d{2}-\d{2}/) || [""])[0];
