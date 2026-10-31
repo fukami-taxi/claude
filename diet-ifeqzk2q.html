@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<meta name="app-version" content="2026-11-01-4">
+<meta name="app-version" content="2026-11-01-5">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="音声ダイエットメモ">
 <title>音声ダイエットメモ</title>
@@ -193,12 +193,14 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
     <input type="tel" id="weight" inputmode="decimal" autocomplete="off" class="grow">
     <span style="color:var(--muted)">kg</span>
   </div>
+  <div class="chips" id="wRange" style="margin-top:12px"></div>
   <div class="hint" id="wLine"></div>
   <div id="wChart" style="margin-top:8px"></div>
 </div>
 
 <div class="card">
-  <label class="first">この7日間の合計</label>
+  <label class="first" id="weekTitle">この7日間の合計</label>
+  <div class="chips" id="barRange" style="margin-bottom:8px"></div>
   <div id="weekChart"></div>
   <div class="stats" style="margin-top:12px">
     <div class="stat"><div class="k">1日の平均</div><div class="v" id="wAvg">-</div></div>
@@ -413,21 +415,39 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
     });
   }
 
+  // グラフの期間：1週間・2週間・3週間・1か月（このスマホにだけ、おぼえる）
+  var KEY_V = "rec.view.v1";
+  var view = load(KEY_V, {});
+  var RANGES = [[7, "1週間"], [14, "2週間"], [21, "3週間"], [30, "1か月"]];
+  function rangeOf(which) { var n = view[which]; return RANGES.some(function (r) { return r[0] === n; }) ? n : (which === "w" ? 30 : 7); }
+  function renderRangeChips(boxId, which) {
+    var box = $(boxId); box.innerHTML = "";
+    RANGES.forEach(function (r) {
+      var b = document.createElement("button"); b.type = "button"; b.className = "chip" + (rangeOf(which) === r[0] ? " on" : ""); b.textContent = r[1];
+      b.addEventListener("click", function () { view[which] = r[0]; save(KEY_V, view); renderRangeChips(boxId, which); if (which === "w") renderWeightChart(); else renderWeek(); });
+      box.appendChild(b);
+    });
+  }
+  function rangeName(n) { for (var i = 0; i < RANGES.length; i++) if (RANGES[i][0] === n) return RANGES[i][1]; return n + "日間"; }
   function renderWeek() {
-    var ks = [], i;
-    for (i = 6; i >= 0; i--) ks.push(addDays(cur, -i));
+    var N = rangeOf("bar"), ks = [], i;
+    for (i = N - 1; i >= 0; i--) ks.push(addDays(cur, -i));
+    $("weekTitle").textContent = "この" + (N === 30 ? "1か月（30日間）" : N + "日間") + "の合計";
+    renderRangeChips("barRange", "bar");
     var g = settings.goalKcal;
     var vals = ks.map(totalOf);
     var mx = Math.max.apply(null, vals.concat(g || 0, 1));
-    var W = 320, H = 170, L = 8, R = 8, T = 22, B = 24, bw = (W - L - R) / 7;
-    var s = '<svg class="bars" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="この7日間の合計カロリー">';
+    var W = 320, H = 170, L = 8, R = 8, T = 22, B = 24, bw = (W - L - R) / N;
+    var s = '<svg class="bars" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="この期間の合計カロリー">';
     ks.forEach(function (k, j) {
       var h = vals[j] / mx * (H - T - B), x = L + j * bw + bw * 0.16, w = bw * 0.68;
       var over = g && vals[j] > g;
       var fill = vals[j] === 0 ? "var(--line)" : over ? "var(--over)" : "var(--accent)";
       s += '<rect x="' + x.toFixed(1) + '" y="' + (H - B - Math.max(h, 2)).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + Math.max(h, 2).toFixed(1) + '" rx="4" fill="' + fill + '"' + (k === cur ? ' stroke="var(--text)" stroke-width="1.5"' : "") + "/>";
-      if (vals[j]) s += '<text x="' + (x + w / 2).toFixed(1) + '" y="' + (H - B - h - 4).toFixed(1) + '" text-anchor="middle" font-size="10" fill="var(--muted)">' + num(vals[j]) + "</text>";
-      s += '<text x="' + (x + w / 2).toFixed(1) + '" y="' + (H - 7) + '" text-anchor="middle" font-size="10" fill="var(--muted)">' + md(k) + "</text>";
+      if (vals[j] && N <= 7) s += '<text x="' + (x + w / 2).toFixed(1) + '" y="' + (H - B - h - 4).toFixed(1) + '" text-anchor="middle" font-size="10" fill="var(--muted)">' + num(vals[j]) + "</text>";
+      // 日づけは、いちばん右の日から、数えて、とびとびに出す（重ならないように）
+      var step = N <= 7 ? 1 : N <= 14 ? 2 : N <= 21 ? 3 : 5;
+      if ((N - 1 - j) % step === 0) s += '<text x="' + (x + w / 2).toFixed(1) + '" y="' + (H - 7) + '" text-anchor="middle" font-size="' + (N <= 7 ? 10 : 9) + '" fill="var(--muted)">' + md(k) + "</text>";
     });
     if (g) {
       var gy = H - B - g / mx * (H - T - B);
@@ -444,9 +464,10 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
     renderWeightChart();
   }
   function f1(n) { return (Math.round(n * 10) / 10).toFixed(1); }
-  // 体重の推移：見ている日から、さかのぼって30日。体重のある日だけ、結ぶ
+  // 体重の推移：見ている日から、さかのぼって、えらんだ期間（はじめは30日）。体重のある日だけ、結ぶ
   function renderWeightChart() {
-    var from = addDays(cur, -29);
+    renderRangeChips("wRange", "w");
+    var from = addDays(cur, -(rangeOf("w") - 1));
     var ks = Object.keys(days).filter(function (k) { return k >= from && k <= cur && typeof days[k].w === "number"; }).sort();
     var line = $("wLine"), box = $("wChart");
     if (!ks.length) { line.textContent = "体重を入れると、ここに、グラフが出ます。"; box.innerHTML = ""; return; }
