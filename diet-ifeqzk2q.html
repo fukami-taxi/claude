@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<meta name="app-version" content="2026-10-31-3">
+<meta name="app-version" content="2026-11-01-4">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="音声ダイエットメモ">
 <title>音声ダイエットメモ</title>
@@ -170,6 +170,15 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
     <div class="kcalbox grow"><input type="tel" id="kcal" inputmode="numeric" autocomplete="off" aria-label="カロリー"><span>kcal</span></div>
     <div style="flex:0 0 84px"><button class="btn ghost" id="clearKcalBtn" type="button" style="color:var(--text);padding-left:6px;padding-right:6px">クリア</button></div>
     <div style="flex:0 0 112px"><button class="btn" id="addBtn" type="button">追加</button></div>
+  </div>
+  <div id="qtyBox" style="margin-top:12px">
+    <label for="qtyNum" style="margin-top:0">同じものを、いくつか、食べたとき</label>
+    <div class="row">
+      <span style="font-size:20px;font-weight:700">×</span>
+      <input type="tel" id="qtyNum" inputmode="numeric" autocomplete="off" value="2" aria-label="いくつ" style="width:84px;text-align:center">
+      <button class="chip" id="qtyOn" type="button" style="min-width:140px">複数</button>
+    </div>
+    <div id="qtyNote" style="color:var(--muted);font-size:14px;margin-top:6px;min-height:20px"></div>
   </div>
   <label id="freqLabel">よく食べるもの（タップで、入れる）</label>
   <div class="chips" id="freq"></div>
@@ -350,7 +359,7 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
           var ed = document.createElement("button"); ed.type = "button"; ed.className = "ed"; ed.textContent = "直す";
           ed.addEventListener("click", function () {
             editId = it.id; meal = it.meal; $("name").value = it.name; $("kcal").value = String(it.kcal);
-            $("addBtn").textContent = "保存"; renderChips(); window.scrollTo(0, 0); $("name").focus();
+            $("addBtn").textContent = "保存"; renderChips(); renderQty(); window.scrollTo(0, 0); $("name").focus();
           });
           var rm = document.createElement("button"); rm.type = "button"; rm.className = "rm"; rm.textContent = "消す";
           rm.addEventListener("click", function () {
@@ -381,12 +390,15 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
     var map = {};
     Object.keys(days).sort().forEach(function (k) {
       (days[k].items || []).forEach(function (it) {
-        var f = map[it.name] || (map[it.name] = { name: it.name, kcal: it.kcal, n: 0 });
-        f.kcal = it.kcal; f.n++;
+        // 「ラーメン ×2」は、「ラーメン」の、1つ分に、直して数える
+        var nm = it.name, kc = it.kcal, q = /^(.*\S)\s*×([2-9])$/.exec(nm);
+        if (q) { nm = q[1]; kc = Math.round(kc / Number(q[2])); }
+        var f = map[nm] || (map[nm] = { name: nm, kcal: kc, n: 0 });
+        f.kcal = kc; f.n++;
       });
     });
     return Object.keys(map).map(function (k) { return map[k]; })
-      .sort(function (a, b) { return b.n - a.n; }).slice(0, 10);
+      .sort(function (a, b) { return b.n - a.n; }).slice(0, 20);
   }
   function renderFreq() {
     var box = $("freq"); box.innerHTML = "";
@@ -396,7 +408,7 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
       var b = document.createElement("button"); b.type = "button"; b.className = "chip";
       b.innerHTML = "<span></span> <small></small>";
       b.firstChild.textContent = f.name; b.lastChild.textContent = f.kcal + " kcal";
-      b.addEventListener("click", function () { $("name").value = f.name; $("kcal").value = String(f.kcal); });
+      b.addEventListener("click", function () { $("name").value = f.name; $("kcal").value = String(f.kcal); renderQty(); });
       box.appendChild(b);
     });
   }
@@ -469,18 +481,33 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
   function renderAll() {
     $("dateJp").textContent = dayJp(cur);
     $("date").value = cur;
-    renderRing(); renderMeals(); renderFreq(); renderWeek(); renderWeight(); renderBanner();
+    renderRing(); renderMeals(); renderFreq(); renderWeek(); renderWeight(); renderBanner(); renderQty();
   }
   function resetForm() {
-    editId = null; $("name").value = ""; $("kcal").value = ""; $("addBtn").textContent = "追加"; renderChips();
+    editId = null; qtyOn = false; $("qtyNum").value = "2"; $("name").value = ""; $("kcal").value = ""; $("addBtn").textContent = "追加"; renderChips(); renderQty();
   }
   function setDay(k) { cur = k; resetForm(); renderAll(); }
 
+  // 「いくつ食べた？」：×1〜×5。カロリー欄は「1つ分」を入れ、追加するとき、かけ算して、名前に「×2」を足す
+  var qtyOn = false;
+  function qtyValue() { if (!qtyOn) return 1; var n = parseInt0($("qtyNum").value); return n === null ? 0 : n; }
+  function renderQty() {
+    $("qtyBox").style.display = editId !== null ? "none" : "block";
+    $("qtyOn").className = "chip" + (qtyOn ? " on" : "");
+    $("qtyOn").textContent = qtyOn ? "複数：オン" : "複数";
+    var k = parseInt0($("kcal").value), q = qtyValue();
+    $("qtyNote").textContent = (qtyOn && q > 1 && k !== null) ? num(k) + " kcal × " + q + " ＝ " + num(k * q) + " kcal" : "";
+  }
   function addItem() {
     var name = $("name").value.trim(), kcal = parseInt0($("kcal").value);
     if (!meal) { toast("「朝・昼・夜・間食」を、えらんでください"); return; }
     if (!name) { toast("食べたものを、入れてください"); return; }
     if (kcal === null) { toast("カロリーを、数字で入れてください"); return; }
+    if (editId === null && qtyOn) {
+      var q = qtyValue();
+      if (q < 2 || q > 99) { toast("「×」の数は、2〜99で、入れてください"); return; }
+      kcal = kcal * q; name = name + " ×" + q;
+    }
     if (kcal > 20000) { toast("カロリーが、大きすぎます。確認してください"); return; }
     var d = dayOf(cur);
     if (editId !== null) {
@@ -809,7 +836,10 @@ textarea { width: 100%; min-height: 90px; font-size: 16px; padding: 10px 12px; b
   $("date").addEventListener("change", function () { if (this.value) setDay(this.value); });
   $("addBtn").addEventListener("click", addItem);
   // 「クリア」：食べたものと、カロリーの、両方を、空にする（直している最中でも、欄だけ、空にする）
-  $("clearKcalBtn").addEventListener("click", function () { $("name").value = ""; $("kcal").value = ""; $("name").focus(); });
+  $("clearKcalBtn").addEventListener("click", function () { $("name").value = ""; $("kcal").value = ""; qtyOn = false; $("qtyNum").value = "2"; renderQty(); $("name").focus(); });
+  $("kcal").addEventListener("input", renderQty);
+  $("qtyOn").addEventListener("click", function () { qtyOn = !qtyOn; renderQty(); });
+  $("qtyNum").addEventListener("input", function () { this.value = toHalf(this.value).replace(/[^0-9]/g, ""); qtyOn = true; renderQty(); });
   $("kcal").addEventListener("keydown", function (e) { if (e.key === "Enter") addItem(); });
   $("setBtn").addEventListener("click", saveGoal);
   $("weight").addEventListener("input", function () { saveWeight(false); });
