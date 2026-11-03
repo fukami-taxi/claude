@@ -52,6 +52,7 @@ ul.order li { display: flex; align-items: center; gap: 6px; padding: 6px 0; bord
 ul.order li span { flex: 1; }
 ul.order button { width: 44px; height: 40px; border: 0; border-radius: 10px; background: var(--accent-soft); color: var(--accent); font-size: 18px; }
 ul.order button:disabled { opacity: 0.3; }
+ul.order button.del { width: auto; padding: 0 10px; font-size: 15px; background: transparent; color: var(--danger); border: 1px solid var(--danger); }
 .chip { border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 999px;
   padding: 7px 12px; font-size: 15px; }
 .chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
@@ -109,7 +110,7 @@ ul.list li:last-child { border-bottom: 0; }
 
 <div class="card">
   <input id="q" type="search" placeholder="名前・電話番号でさがす" autocomplete="off">
-  <div class="labelHead"><span>グループ</span><button class="linkBtn" id="orderBtn" type="button">並べ替え</button></div>
+  <div class="labelHead"><span>グループ</span><button class="linkBtn" id="orderBtn" type="button">並べ替え・削除</button></div>
   <div class="grid" id="labelChips"></div>
   <ul class="order" id="orderList" style="display:none"></ul>
   <div style="margin-top:10px"><button class="btn sub" id="newBtn" type="button">＋ 新しい連絡先</button></div>
@@ -251,19 +252,38 @@ ul.list li:last-child { border-bottom: 0; }
         });
         li.appendChild(b);
       });
+      var del = document.createElement("button"); del.type = "button"; del.className = "del"; del.textContent = "削除";
+      del.addEventListener("click", function () { deleteLabel(g); });
+      li.appendChild(del);
       ul.appendChild(li);
+    });
+    if (!gs.length) ul.innerHTML = '<li><span class="hint">グループは、ありません</span></li>';
+  }
+  // グループだけを消す。中の連絡先は、消さない（Googleの連絡先には、残る）
+  function deleteLabel(g) {
+    if (!window.confirm("グループ「" + g.name + "」を、Googleから消します。\n中の連絡先は、消えません（グループから外れるだけです）。\nよろしいですか？")) return;
+    withToken(function () {
+      api("DELETE", g.id + "?deleteContacts=false").then(function () {
+        data.groups = data.groups.filter(function (x) { return x.id !== g.id; });
+        data.people.forEach(function (p) { p.labels = p.labels.filter(function (id) { return id !== g.id; }); });
+        save(KEY_DATA, data);
+        labelOrder = labelOrder.filter(function (id) { return id !== g.id; }); save(KEY_ORDER, labelOrder);
+        if (labelFilter === g.id) { labelFilter = ""; save(KEY_LABEL, labelFilter); }
+        renderOrder(); renderList();
+        toast("グループ「" + g.name + "」を消しました");
+      }).catch(function (e) { toast(e.message); });
     });
   }
   function toggleOrder() {
     ordering = !ordering;
-    $("orderBtn").textContent = ordering ? "おわり" : "並べ替え";
+    $("orderBtn").textContent = ordering ? "おわり" : "並べ替え・削除";
     $("orderList").style.display = ordering ? "block" : "none";
     $("labelChips").style.display = ordering ? "none" : "grid";
     if (ordering) renderOrder(); else renderLabelChips();
   }
   function renderLabelChips() {
     var box = $("labelChips"); box.innerHTML = "";
-    $("orderBtn").style.display = data.groups.length > 1 ? "inline" : "none";
+    $("orderBtn").style.display = data.groups.length ? "inline" : "none";
     var all = [{ id: "", name: "全部" }].concat(orderedGroups());
     all.forEach(function (g) {
       var b = document.createElement("button"); b.type = "button";
