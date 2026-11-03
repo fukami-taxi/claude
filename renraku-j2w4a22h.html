@@ -42,6 +42,16 @@ input, textarea { width: 100%; font-size: 17px; padding: 11px 12px; border: 1px 
 textarea { min-height: 70px; }
 label { display: block; font-size: 14px; color: var(--muted); margin: 12px 0 4px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
+.grid .chip { border-radius: 10px; padding: 10px 4px; text-align: center; line-height: 1.3; word-break: break-all; }
+.labelHead { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+.labelHead span { font-size: 14px; color: var(--muted); }
+.linkBtn { border: 0; background: none; color: var(--accent); font-size: 15px; padding: 4px 0; }
+ul.order { list-style: none; margin: 8px 0 0; padding: 0; }
+ul.order li { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+ul.order li span { flex: 1; }
+ul.order button { width: 44px; height: 40px; border: 0; border-radius: 10px; background: var(--accent-soft); color: var(--accent); font-size: 18px; }
+ul.order button:disabled { opacity: 0.3; }
 .chip { border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 999px;
   padding: 7px 12px; font-size: 15px; }
 .chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
@@ -87,7 +97,7 @@ ul.list li:last-child { border-bottom: 0; }
   <label for="fEmails">メール（1行に1つ）</label>
   <textarea id="fEmails" inputmode="email"></textarea>
   <label>ラベル（グループ）</label>
-  <div class="chips" id="fLabels"></div>
+  <div class="grid" id="fLabels"></div>
   <div class="row" style="margin-top:8px">
     <input id="newLabel" type="text" placeholder="新しいラベルの名前" autocomplete="off">
     <button class="btn sub" id="addLabelBtn" type="button" style="flex:0 0 auto;width:auto">作る</button>
@@ -99,7 +109,9 @@ ul.list li:last-child { border-bottom: 0; }
 
 <div class="card">
   <input id="q" type="search" placeholder="名前・電話番号でさがす" autocomplete="off">
-  <div class="chips" id="labelChips"></div>
+  <div class="labelHead"><span>グループ</span><button class="linkBtn" id="orderBtn" type="button">並べ替え</button></div>
+  <div class="grid" id="labelChips"></div>
+  <ul class="order" id="orderList" style="display:none"></ul>
   <div style="margin-top:10px"><button class="btn sub" id="newBtn" type="button">＋ 新しい連絡先</button></div>
 </div>
 
@@ -120,6 +132,7 @@ ul.list li:last-child { border-bottom: 0; }
   var FIELDS = "names,phoneNumbers,emailAddresses,memberships";
   var KEY_DATA = "renraku.data.v1";
   var KEY_LABEL = "renraku.label.v1";
+  var KEY_ORDER = "renraku.labelOrder.v1";
 
   function $(id) { return document.getElementById(id); }
   function load(k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
@@ -131,6 +144,8 @@ ul.list li:last-child { border-bottom: 0; }
 
   var data = load(KEY_DATA, { people: [], groups: [], syncedAt: null });
   var labelFilter = load(KEY_LABEL, "");
+  var labelOrder = load(KEY_ORDER, []);   // グループの並び順（このiPhoneの中だけ。Googleには送らない）
+  var ordering = false;
   var token = null, tokenExp = 0, tokenClient = null, pending = [];
   var editing = null;   // 直している人（新しいときは {}）
   var editLabels = {};
@@ -212,9 +227,44 @@ ul.list li:last-child { border-bottom: 0; }
     var d = new Date(data.syncedAt);
     $("status").textContent = "最後に同期：" + (d.getMonth() + 1) + "月" + d.getDate() + "日 " + d.getHours() + ":" + ("0" + d.getMinutes()).slice(-2);
   }
+  // 並び順に並べたグループ。並び順にないもの（新しいグループ）は、名前順で、うしろに足す
+  function orderedGroups() {
+    var byId = {}; data.groups.forEach(function (g) { byId[g.id] = g; });
+    var out = labelOrder.filter(function (id) { return byId[id]; }).map(function (id) { return byId[id]; });
+    var rest = data.groups.filter(function (g) { return labelOrder.indexOf(g.id) < 0; })
+      .sort(function (a, b) { return a.name.localeCompare(b.name, "ja"); });
+    return out.concat(rest);
+  }
+  function renderOrder() {
+    var ul = $("orderList"); ul.innerHTML = "";
+    var gs = orderedGroups();
+    gs.forEach(function (g, i) {
+      var li = document.createElement("li");
+      var nm = document.createElement("span"); nm.textContent = g.name; li.appendChild(nm);
+      [["▲", -1], ["▼", 1]].forEach(function (d) {
+        var b = document.createElement("button"); b.type = "button"; b.textContent = d[0];
+        b.disabled = (i + d[1] < 0 || i + d[1] >= gs.length);
+        b.addEventListener("click", function () {
+          var ids = gs.map(function (x) { return x.id; });
+          var t = ids[i]; ids[i] = ids[i + d[1]]; ids[i + d[1]] = t;
+          labelOrder = ids; save(KEY_ORDER, labelOrder); renderOrder();
+        });
+        li.appendChild(b);
+      });
+      ul.appendChild(li);
+    });
+  }
+  function toggleOrder() {
+    ordering = !ordering;
+    $("orderBtn").textContent = ordering ? "おわり" : "並べ替え";
+    $("orderList").style.display = ordering ? "block" : "none";
+    $("labelChips").style.display = ordering ? "none" : "grid";
+    if (ordering) renderOrder(); else renderLabelChips();
+  }
   function renderLabelChips() {
     var box = $("labelChips"); box.innerHTML = "";
-    var all = [{ id: "", name: "全部" }].concat(data.groups);
+    $("orderBtn").style.display = data.groups.length > 1 ? "inline" : "none";
+    var all = [{ id: "", name: "全部" }].concat(orderedGroups());
     all.forEach(function (g) {
       var b = document.createElement("button"); b.type = "button";
       b.className = "chip" + (labelFilter === g.id ? " on" : ""); b.textContent = g.name;
@@ -264,7 +314,7 @@ ul.list li:last-child { border-bottom: 0; }
   function renderEditLabels() {
     var box = $("fLabels"); box.innerHTML = "";
     if (!data.groups.length) { box.innerHTML = '<span class="hint">ラベルは、まだありません</span>'; return; }
-    data.groups.forEach(function (g) {
+    orderedGroups().forEach(function (g) {
       var b = document.createElement("button"); b.type = "button";
       b.className = "chip" + (editLabels[g.id] ? " on" : ""); b.textContent = g.name;
       b.addEventListener("click", function () { editLabels[g.id] = !editLabels[g.id]; renderEditLabels(); });
@@ -334,6 +384,7 @@ ul.list li:last-child { border-bottom: 0; }
   $("cancelBtn").addEventListener("click", endEdit);
   $("deleteBtn").addEventListener("click", deleteContact);
   $("addLabelBtn").addEventListener("click", addLabel);
+  $("orderBtn").addEventListener("click", toggleOrder);
   renderAll();
 })();
 </script>
