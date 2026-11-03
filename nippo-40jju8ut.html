@@ -144,13 +144,13 @@ textarea {
   <input type="text" id="to" list="places" autocomplete="off">
   <div class="chips" id="toChips"></div>
 
-  <label for="time">降車時刻（4桁）</label>
+  <label for="time">降車時刻（4桁）（あとで入れてもOK）</label>
   <div class="row">
     <input type="tel" id="time" inputmode="numeric" maxlength="4">
     <button class="btn sub now" id="nowBtn" type="button">いま</button>
   </div>
 
-  <label for="fare">料金（円）</label>
+  <label for="fare">料金（円）（あとで入れてもOK）</label>
   <input type="tel" id="fare" inputmode="numeric">
 
   <label>支払い方法（なくてもOK）</label>
@@ -375,7 +375,8 @@ textarea {
   }
 
   function lineOf(t) {
-    var parts = [String(t.people), t.from, t.to, t.time, String(t.fare)];
+    // 時刻・料金が無いときは「-」にして、列がずれないようにする（取り込み側は、その行を取り込まずに知らせる）
+    var parts = [String(t.people), t.from, t.to, t.time || "-", t.fare == null ? "-" : String(t.fare)];
     if (t.pay) parts.push(t.pay);
     if (t.toll) parts.push("高速" + t.toll);
     if (t.tollBack) parts.push("帰り高速" + t.tollBack);
@@ -388,13 +389,13 @@ textarea {
     ul.innerHTML = "";
     var total = 0;
     trips.forEach(function (t, i) {
-      total += t.fare;
+      total += t.fare || 0;
       var li = document.createElement("li");
       var no = document.createElement("span"); no.className = "no"; no.textContent = String(i + 1);
       var body = document.createElement("span"); body.className = "body";
       body.textContent = t.people + "人 " + t.from + " → " + t.to;
       var sub = document.createElement("div"); sub.className = "sub";
-      sub.textContent = t.time + " / " + t.fare + "円" + (t.pay ? " / " + t.pay : "") + (t.toll ? " / 高速" + t.toll + "円" : "") + (t.tollBack ? " / 帰り高速" + t.tollBack + "円" : "") + (t.note ? " / " + t.note : "");
+      sub.textContent = (t.time || "時刻なし") + " / " + (t.fare == null ? "料金なし" : t.fare + "円") + (t.pay ? " / " + t.pay : "") + (t.toll ? " / 高速" + t.toll + "円" : "") + (t.tollBack ? " / 帰り高速" + t.tollBack + "円" : "") + (t.note ? " / " + t.note : "");
       body.appendChild(sub);
       var del = document.createElement("button"); del.className = "del"; del.type = "button"; del.textContent = "削除";
       del.addEventListener("click", function () {
@@ -473,7 +474,7 @@ textarea {
   }
   function startEdit(i, t) {
     people = t.people; renderPeople();
-    $("from").value = t.from; $("to").value = t.to; $("time").value = t.time; $("fare").value = String(t.fare);
+    $("from").value = t.from; $("to").value = t.to; $("time").value = t.time || ""; $("fare").value = t.fare == null ? "" : String(t.fare);
     selectedPay = t.pay || ""; renderPay();
     $("toll").value = t.toll ? String(t.toll) : ""; $("tollBack").value = t.tollBack ? String(t.tollBack) : "";
     selectedNotes = {}; renderNotes(); $("note").value = t.note || "";
@@ -495,14 +496,14 @@ textarea {
     var time = normTime($("time").value);
     var fareRaw = toHalf($("fare").value).replace(/[^0-9]/g, "");
     if (!from || !to) { toast("乗車地と降車地を入れてください"); return; }
-    if (!time) { toast("降車時刻を4桁で入れてください（例 1435）"); return; }
-    if (!fareRaw) { toast("料金を入れてください"); return; }
+    // 降車時刻と料金は、空でも追加できる（あとで「編集」で入れる）。入っているのに形が違うときだけ止める
+    if (!time && $("time").value.trim()) { toast("降車時刻を4桁で入れてください（例 1435）"); return; }
     var toll = parseInt(toHalf($("toll").value).replace(/[^0-9]/g, ""), 10) || 0;
     var tollBack = parseInt(toHalf($("tollBack").value).replace(/[^0-9]/g, ""), 10) || 0;
     var notes = NOTE_PRESETS.filter(function (n) { return selectedNotes[n]; });
     var extra = $("note").value.trim();
     if (extra) notes.push(extra);
-    var trip = { people: people, from: from, to: to, time: time, fare: parseInt(fareRaw, 10), pay: selectedPay, toll: toll, tollBack: tollBack, note: notes.join(" ") };
+    var trip = { people: people, from: from, to: to, time: time, fare: fareRaw ? parseInt(fareRaw, 10) : null, pay: selectedPay, toll: toll, tollBack: tollBack, note: notes.join(" ") };
     var wasEdit = (editIndex !== null && editDate === $("date").value && editIndex < currentTrips().length);
     var doneMsg = null;
     if (wasEdit) { currentTrips()[editIndex] = trip; doneMsg = (editIndex + 1) + "件目を、直しました"; }
@@ -529,9 +530,25 @@ textarea {
       navigator.clipboard.writeText(text).then(function () { toast("コピーしました"); }, fallback);
     } else { fallback(); }
   }
+  // 送る記録の中に、降車時刻か料金が空のものがあれば、どこかを返す（なければ null）
+  function firstMissing() {
+    var ks = targetDays();
+    for (var d = 0; d < ks.length; d++) {
+      var trips = days[ks[d]];
+      for (var i = 0; i < trips.length; i++) {
+        var t = trips[i], what = [];
+        if (!t.time) what.push("降車時刻");
+        if (t.fare == null) what.push("料金");
+        if (what.length) return dayLabel(ks[d]) + " の " + (i + 1) + "件目（" + t.from + " → " + t.to + "）に、" + what.join("と") + "が、入っていません。";
+      }
+    }
+    return null;
+  }
   function shareText() {
     var text = $("out").value;
     if (!text) { toast("共有する記録がありません"); return; }
+    var miss = firstMissing();
+    if (miss) { window.alert("送れません。\n" + miss + "\n「編集」で、降車時刻と料金を、入れてください。"); return; }
     if (navigator.share) {
       navigator.share({ title: "日報 " + dayLabel($("date").value), text: text }).catch(function () { /* cancelled */ });
     } else { copyText(); }
