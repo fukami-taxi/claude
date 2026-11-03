@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="連絡先">
+<title>連絡先メモ</title>
+<style>
+:root {
+  --bg: #f3f5f8;
+  --card: #ffffff;
+  --text: #1d2430;
+  --muted: #6b7686;
+  --line: #dde3ea;
+  --accent: #2f6fd6;
+  --accent-text: #ffffff;
+  --accent-soft: #e6eefb;
+  --danger: #c0392b;
+  --ok: #2e8b57;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #11151b; --card: #1b212a; --text: #e8edf3; --muted: #9aa6b4;
+    --line: #2c3540; --accent: #5b93ee; --accent-soft: #1f2d44; --danger: #e06b5e; --ok: #5cc28a;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 12px 16px 80px; background: var(--bg); color: var(--text);
+  font-family: -apple-system, "Hiragino Sans", sans-serif; font-size: 17px; }
+h1 { font-size: 22px; margin: 6px 0 12px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+.btn { display: block; width: 100%; border: 0; border-radius: 12px; padding: 14px; font-size: 17px; font-weight: 700;
+  background: var(--accent); color: var(--accent-text); }
+.btn.sub { background: var(--accent-soft); color: var(--accent); }
+.btn.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+.row { display: flex; gap: 8px; }
+.row > * { flex: 1; }
+input, textarea { width: 100%; font-size: 17px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--card); color: var(--text); font-family: inherit; }
+textarea { min-height: 70px; }
+label { display: block; font-size: 14px; color: var(--muted); margin: 12px 0 4px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip { border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 999px;
+  padding: 7px 12px; font-size: 15px; }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.hint { color: var(--muted); font-size: 14px; margin-top: 8px; line-height: 1.6; }
+.status { font-size: 14px; color: var(--muted); margin-top: 8px; }
+.toast { color: var(--ok); min-height: 20px; font-size: 15px; margin-top: 6px; }
+ul.list { list-style: none; margin: 0; padding: 0; }
+ul.list li { padding: 12px 4px; border-bottom: 1px solid var(--line); }
+ul.list li:last-child { border-bottom: 0; }
+.name { font-weight: 700; }
+.sub { color: var(--muted); font-size: 14px; margin-top: 2px; }
+.acts { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.acts a, .acts button { text-decoration: none; font-size: 15px; padding: 8px 12px; border-radius: 10px;
+  background: var(--accent-soft); color: var(--accent); border: 0; }
+.tag { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft);
+  color: var(--accent); margin: 4px 4px 0 0; }
+#setup { display: none; }
+#editCard { display: none; }
+</style>
+</head>
+<body>
+<h1>連絡先メモ</h1>
+
+<div class="card" id="setup">
+  <strong>まだ、使える状態ではありません。</strong>
+  <div class="hint">このページの中に、Googleの「クライアントID」が、まだ書かれていません。設定がすんだら、使えるようになります。</div>
+</div>
+
+<div class="card">
+  <button class="btn" id="syncBtn" type="button">Googleと同期</button>
+  <div class="status" id="status"></div>
+  <div class="toast" id="toast" role="status"></div>
+</div>
+
+<div class="card" id="editCard">
+  <div class="name" id="editTitle">新しい連絡先</div>
+  <div class="row">
+    <div><label for="fFamily">姓</label><input id="fFamily" type="text" autocomplete="off"></div>
+    <div><label for="fGiven">名</label><input id="fGiven" type="text" autocomplete="off"></div>
+  </div>
+  <label for="fPhones">電話番号（1行に1つ）</label>
+  <textarea id="fPhones" inputmode="tel"></textarea>
+  <label for="fEmails">メール（1行に1つ）</label>
+  <textarea id="fEmails" inputmode="email"></textarea>
+  <label>ラベル（グループ）</label>
+  <div class="chips" id="fLabels"></div>
+  <div class="row" style="margin-top:8px">
+    <input id="newLabel" type="text" placeholder="新しいラベルの名前" autocomplete="off">
+    <button class="btn sub" id="addLabelBtn" type="button" style="flex:0 0 auto;width:auto">作る</button>
+  </div>
+  <div style="margin-top:14px"><button class="btn" id="saveBtn" type="button">Googleに保存</button></div>
+  <div style="margin-top:8px"><button class="btn sub" id="cancelBtn" type="button">やめる</button></div>
+  <div style="margin-top:8px"><button class="btn danger" id="deleteBtn" type="button">この連絡先を消す</button></div>
+</div>
+
+<div class="card">
+  <input id="q" type="search" placeholder="名前・電話番号でさがす" autocomplete="off">
+  <div class="chips" id="labelChips"></div>
+  <div style="margin-top:10px"><button class="btn sub" id="newBtn" type="button">＋ 新しい連絡先</button></div>
+</div>
+
+<div class="card">
+  <div class="sub" id="count"></div>
+  <ul class="list" id="list"></ul>
+</div>
+
+<div class="hint">連絡先の写しは、このiPhoneの中にだけ保存されます。元の連絡先は、Googleにあります。</div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+(function () {
+  // Google Cloud で作った「ウェブ アプリケーション」のクライアントID をここに書く
+  var CLIENT_ID = "282006237780-pmem3ahmacl2jdll4336j99hu2712b7e.apps.googleusercontent.com";
+  var SCOPE = "https://www.googleapis.com/auth/contacts";
+  var API = "https://people.googleapis.com/v1/";
+  var FIELDS = "names,phoneNumbers,emailAddresses,memberships";
+  var KEY_DATA = "renraku.data.v1";
+  var KEY_LABEL = "renraku.label.v1";
+
+  function $(id) { return document.getElementById(id); }
+  function load(k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
+  function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function toast(msg) {
+    $("toast").textContent = msg;
+    clearTimeout(toast.t); toast.t = setTimeout(function () { $("toast").textContent = ""; }, 3000);
+  }
+
+  var data = load(KEY_DATA, { people: [], groups: [], syncedAt: null });
+  var labelFilter = load(KEY_LABEL, "");
+  var token = null, tokenExp = 0, tokenClient = null, pending = [];
+  var editing = null;   // 直している人（新しいときは {}）
+  var editLabels = {};
+
+  // ---------- ログイン（通行証は1時間ほど。切れたら、ボタンを押したときに、取り直す） ----------
+  function withToken(fn) {
+    if (token && Date.now() < tokenExp - 60000) { fn(); return; }
+    if (!CLIENT_ID) { toast("まだ設定がすんでいません"); return; }
+    if (!window.google || !google.accounts || !google.accounts.oauth2) { toast("Googleの読み込み中です。少し待ってから、もう一度押してください"); return; }
+    if (!tokenClient) {
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID, scope: SCOPE,
+        callback: function (r) {
+          if (r.error) { pending = []; toast("ログインできませんでした"); return; }
+          token = r.access_token; tokenExp = Date.now() + (r.expires_in || 3600) * 1000;
+          var q = pending; pending = []; q.forEach(function (f) { f(); });
+        }
+      });
+    }
+    pending.push(fn);
+    tokenClient.requestAccessToken({ prompt: token ? "" : undefined });
+  }
+  function api(method, path, body) {
+    return fetch(API + path, {
+      method: method,
+      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (r) {
+      if (r.status === 401) { token = null; throw new Error("ログインが切れました。もう一度押してください"); }
+      if (!r.ok) return r.text().then(function (t) { throw new Error("Googleとのやりとりで、エラーになりました（" + r.status + "）"); });
+      return r.status === 204 ? {} : r.json();
+    });
+  }
+
+  // ---------- 同期（Googleから、全部取ってきて、写しを作り直す） ----------
+  function sync() {
+    withToken(function () {
+      $("status").textContent = "同期しています…";
+      var people = [];
+      function page(tokenStr) {
+        return api("GET", "people/me/connections?personFields=" + FIELDS + "&pageSize=1000&sortOrder=LAST_NAME_ASCENDING" + (tokenStr ? "&pageToken=" + encodeURIComponent(tokenStr) : ""))
+          .then(function (r) { people = people.concat(r.connections || []); return r.nextPageToken ? page(r.nextPageToken) : null; });
+      }
+      Promise.all([page(null), api("GET", "contactGroups?pageSize=1000")])
+        .then(function (res) {
+          var groups = (res[1].contactGroups || []).filter(function (g) { return g.groupType === "USER_CONTACT_GROUP"; })
+            .map(function (g) { return { id: g.resourceName, name: g.formattedName || g.name }; });
+          data = { people: people.map(slim), groups: groups, syncedAt: new Date().toISOString() };
+          save(KEY_DATA, data);
+          renderAll();
+          toast(people.length + "件を、同期しました");
+        })
+        .catch(function (e) { $("status").textContent = ""; toast(e.message); renderStatus(); });
+    });
+  }
+  // 写しに残すのは、表示と編集に使う分だけ
+  function slim(p) {
+    var n = (p.names || [])[0] || {};
+    return {
+      id: p.resourceName, etag: p.etag,
+      display: n.displayName || [n.familyName, n.givenName].filter(Boolean).join(" "), family: n.familyName || "", given: n.givenName || "",
+      phones: (p.phoneNumbers || []).map(function (x) { return x.value; }),
+      emails: (p.emailAddresses || []).map(function (x) { return x.value; }),
+      labels: (p.memberships || []).map(function (m) { return m.contactGroupMembership && m.contactGroupMembership.contactGroupResourceName; })
+        .filter(function (g) { return g && g !== "contactGroups/myContacts" && g !== "contactGroups/starred"; }),
+      system: (p.memberships || []).map(function (m) { return m.contactGroupMembership && m.contactGroupMembership.contactGroupResourceName; })
+        .filter(function (g) { return g === "contactGroups/myContacts" || g === "contactGroups/starred"; })
+    };
+  }
+
+  // ---------- 表示 ----------
+  function groupName(id) {
+    for (var i = 0; i < data.groups.length; i++) if (data.groups[i].id === id) return data.groups[i].name;
+    return "";
+  }
+  function renderStatus() {
+    $("setup").style.display = CLIENT_ID ? "none" : "block";
+    if (!data.syncedAt) { $("status").textContent = "まだ同期していません"; return; }
+    var d = new Date(data.syncedAt);
+    $("status").textContent = "最後に同期：" + (d.getMonth() + 1) + "月" + d.getDate() + "日 " + d.getHours() + ":" + ("0" + d.getMinutes()).slice(-2);
+  }
+  function renderLabelChips() {
+    var box = $("labelChips"); box.innerHTML = "";
+    var all = [{ id: "", name: "全部" }].concat(data.groups);
+    all.forEach(function (g) {
+      var b = document.createElement("button"); b.type = "button";
+      b.className = "chip" + (labelFilter === g.id ? " on" : ""); b.textContent = g.name;
+      b.addEventListener("click", function () { labelFilter = g.id; save(KEY_LABEL, labelFilter); renderLabelChips(); renderList(); });
+      box.appendChild(b);
+    });
+  }
+  function telOf(s) { return String(s).replace(/[^0-9+]/g, ""); }
+  function renderList() {
+    var q = $("q").value.trim().toLowerCase(), qd = telOf(q);
+    var rows = data.people.filter(function (p) {
+      if (labelFilter && p.labels.indexOf(labelFilter) < 0) return false;
+      if (!q) return true;
+      if ((p.display + p.family + p.given).toLowerCase().indexOf(q) >= 0) return true;
+      if (qd && p.phones.some(function (t) { return telOf(t).indexOf(qd) >= 0; })) return true;
+      return p.emails.some(function (m) { return m.toLowerCase().indexOf(q) >= 0; });
+    });
+    var ul = $("list"); ul.innerHTML = "";
+    rows.forEach(function (p) {
+      var li = document.createElement("li");
+      var nm = document.createElement("div"); nm.className = "name"; nm.textContent = p.display || "（名前なし）"; li.appendChild(nm);
+      if (p.phones.length || p.emails.length) {
+        var sub = document.createElement("div"); sub.className = "sub";
+        sub.textContent = p.phones.concat(p.emails).join(" / "); li.appendChild(sub);
+      }
+      p.labels.forEach(function (g) {
+        var nmG = groupName(g); if (!nmG) return;
+        var t = document.createElement("span"); t.className = "tag"; t.textContent = nmG; li.appendChild(t);
+      });
+      var acts = document.createElement("div"); acts.className = "acts";
+      if (p.phones[0]) {
+        var a1 = document.createElement("a"); a1.href = "tel:" + telOf(p.phones[0]); a1.textContent = "電話"; acts.appendChild(a1);
+        var a2 = document.createElement("a"); a2.href = "sms:" + telOf(p.phones[0]); a2.textContent = "メッセージ"; acts.appendChild(a2);
+      }
+      if (p.emails[0]) { var a3 = document.createElement("a"); a3.href = "mailto:" + p.emails[0]; a3.textContent = "メール"; acts.appendChild(a3); }
+      var e = document.createElement("button"); e.type = "button"; e.textContent = "編集";
+      e.addEventListener("click", function () { startEdit(p); });
+      acts.appendChild(e);
+      li.appendChild(acts);
+      ul.appendChild(li);
+    });
+    $("count").textContent = rows.length + "件" + (rows.length !== data.people.length ? "（全部で" + data.people.length + "件）" : "");
+  }
+  function renderAll() { renderStatus(); renderLabelChips(); renderList(); }
+
+  // ---------- 追加・編集・削除（Googleに保存したあと、同期し直す） ----------
+  function renderEditLabels() {
+    var box = $("fLabels"); box.innerHTML = "";
+    if (!data.groups.length) { box.innerHTML = '<span class="hint">ラベルは、まだありません</span>'; return; }
+    data.groups.forEach(function (g) {
+      var b = document.createElement("button"); b.type = "button";
+      b.className = "chip" + (editLabels[g.id] ? " on" : ""); b.textContent = g.name;
+      b.addEventListener("click", function () { editLabels[g.id] = !editLabels[g.id]; renderEditLabels(); });
+      box.appendChild(b);
+    });
+  }
+  function startEdit(p) {
+    editing = p || {};
+    $("editTitle").textContent = p ? "「" + (p.display || "名前なし") + "」を直しています" : "新しい連絡先";
+    $("fFamily").value = p ? p.family : ""; $("fGiven").value = p ? p.given : "";
+    $("fPhones").value = p ? p.phones.join("\n") : ""; $("fEmails").value = p ? p.emails.join("\n") : "";
+    editLabels = {}; (p ? p.labels : (labelFilter ? [labelFilter] : [])).forEach(function (g) { editLabels[g] = true; });
+    $("deleteBtn").style.display = p ? "block" : "none";
+    $("editCard").style.display = "block"; renderEditLabels();
+    window.scrollTo(0, 0);
+  }
+  function endEdit() { editing = null; $("editCard").style.display = "none"; $("newLabel").value = ""; }
+  function lines(id) { return $(id).value.split(/\n/).map(function (s) { return s.trim(); }).filter(Boolean); }
+  function same(a, b) { return a.length === b.length && a.every(function (x, i) { return x === b[i]; }); }
+
+  function saveEdit() {
+    var p = editing; if (!p) return;
+    var family = $("fFamily").value.trim(), given = $("fGiven").value.trim();
+    if (!family && !given) { toast("姓か名を入れてください"); return; }
+    var phones = lines("fPhones"), emails = lines("fEmails");
+    var labels = data.groups.map(function (g) { return g.id; }).filter(function (id) { return editLabels[id]; });
+    var body = {}, fields = [];
+    if (!p.id || family !== p.family || given !== p.given) { body.names = [{ familyName: family, givenName: given }]; fields.push("names"); }
+    // 変えていない欄は、送らない（電話番号の種類（携帯・自宅など）を、消さないため）
+    if (!p.id || !same(phones, p.phones)) { body.phoneNumbers = phones.map(function (v) { return { value: v }; }); fields.push("phoneNumbers"); }
+    if (!p.id || !same(emails, p.emails)) { body.emailAddresses = emails.map(function (v) { return { value: v }; }); fields.push("emailAddresses"); }
+    if (!p.id || !same(labels.slice().sort(), p.labels.slice().sort())) {
+      var keep = p.id ? p.system : ["contactGroups/myContacts"];
+      body.memberships = keep.concat(labels).map(function (g) { return { contactGroupMembership: { contactGroupResourceName: g } }; });
+      fields.push("memberships");
+    }
+    if (p.id && !fields.length) { toast("変わった所がありません"); endEdit(); return; }
+    withToken(function () {
+      var req;
+      if (p.id) { body.etag = p.etag; req = api("PATCH", p.id + ":updateContact?updatePersonFields=" + fields.join(",") + "&personFields=" + FIELDS, body); }
+      else { req = api("POST", "people:createContact?personFields=" + FIELDS, body); }
+      req.then(function () { toast(p.id ? "直しました" : "追加しました"); endEdit(); sync(); })
+         .catch(function (e) { toast(e.message.indexOf("400") >= 0 ? "保存できませんでした。ほかで直された可能性があります。同期してから、もう一度直してください" : e.message); });
+    });
+  }
+  function deleteContact() {
+    var p = editing; if (!p || !p.id) return;
+    if (!window.confirm("「" + (p.display || "名前なし") + "」を、Googleの連絡先から消します。元に戻せません。よろしいですか？")) return;
+    withToken(function () {
+      api("DELETE", p.id + ":deleteContact").then(function () { toast("消しました"); endEdit(); sync(); }).catch(function (e) { toast(e.message); });
+    });
+  }
+  function addLabel() {
+    var name = $("newLabel").value.trim(); if (!name) { toast("ラベルの名前を入れてください"); return; }
+    withToken(function () {
+      api("POST", "contactGroups", { contactGroup: { name: name } }).then(function (g) {
+        data.groups.push({ id: g.resourceName, name: g.formattedName || g.name || name }); save(KEY_DATA, data);
+        editLabels[g.resourceName] = true; $("newLabel").value = ""; renderEditLabels(); renderLabelChips(); toast("ラベル「" + name + "」を作りました");
+      }).catch(function (e) { toast(e.message); });
+    });
+  }
+
+  $("syncBtn").addEventListener("click", sync);
+  $("q").addEventListener("input", renderList);
+  $("newBtn").addEventListener("click", function () { startEdit(null); });
+  $("saveBtn").addEventListener("click", saveEdit);
+  $("cancelBtn").addEventListener("click", endEdit);
+  $("deleteBtn").addEventListener("click", deleteContact);
+  $("addLabelBtn").addEventListener("click", addLabel);
+  renderAll();
+})();
+</script>
+</body>
+</html>
