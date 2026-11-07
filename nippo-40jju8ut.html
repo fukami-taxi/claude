@@ -137,11 +137,11 @@ textarea {
   <div class="chips" id="people"></div>
 
   <label for="from">乗車地</label>
-  <input type="text" id="from" list="places" autocomplete="off">
+  <input type="text" id="from" list="placesFrom" autocomplete="off">
   <div class="chips" id="fromChips"></div>
 
   <label for="to">降車地</label>
-  <input type="text" id="to" list="places" autocomplete="off">
+  <input type="text" id="to" list="placesTo" autocomplete="off">
   <div class="chips" id="toChips"></div>
 
   <label for="time">降車時刻（4桁）（あとで入れてもOK）</label>
@@ -200,13 +200,17 @@ textarea {
   <div class="hint">日報用テキストは、文字を直せます。直した文は、コピーや共有に、そのまま使われます（記録を、足したり消したり、日や範囲を、切り替えると、直した文は、消えて、もとの文になります）。入力した内容は、このiPhoneの中にだけ保存されます。</div>
 </div>
 
-<datalist id="places"></datalist>
+<datalist id="placesFrom"></datalist>
+<datalist id="placesTo"></datalist>
 
 <script>
 (function () {
   "use strict";
   var KEY_DAYS = "nippo.days.v1";
   var KEY_PLACES = "nippo.places.v1";
+  // 乗車地と降車地の履歴は、別々に覚える
+  var KEY_FROM_PLACES = KEY_PLACES.replace("places.v1", "fromPlaces.v1");
+  var KEY_TO_PLACES = KEY_PLACES.replace("places.v1", "toPlaces.v1");
   var KEY_SENT = "nippo.sent.v1";
   var KEY_SCOPE = "nippo.scope.v1";
   var NOTE_PRESETS = [];
@@ -227,7 +231,21 @@ textarea {
   var $ = function (id) { return document.getElementById(id); };
 
   var days = load(KEY_DAYS, {});
-  var places = load(KEY_PLACES, DEFAULT_PLACES);
+  // 初めて開いたときは、今までの記録から、乗車地・降車地の履歴を、それぞれ作る（新しい順）
+  function historyFromDays(field) {
+    var list = [];
+    Object.keys(days).sort().reverse().forEach(function (k) {
+      (days[k] || []).slice().reverse().forEach(function (t) {
+        var p = (t[field] || "").trim();
+        if (p && list.indexOf(p) < 0) list.push(p);
+      });
+    });
+    return list.slice(0, 40);
+  }
+  var fromPlaces = load(KEY_FROM_PLACES, null);
+  if (!fromPlaces) { fromPlaces = historyFromDays("from"); save(KEY_FROM_PLACES, fromPlaces); }
+  var toPlaces = load(KEY_TO_PLACES, null);
+  if (!toPlaces) { toPlaces = historyFromDays("to"); save(KEY_TO_PLACES, toPlaces); }
   var sent = load(KEY_SENT, {});
   var scope = load(KEY_SCOPE, "day");
   var people = 1;
@@ -279,13 +297,18 @@ textarea {
     return days[k];
   }
 
-  function rememberPlace(name) {
+  // kind = "from"（乗車地） または "to"（降車地）
+  function placeList(kind) { return kind === "from" ? fromPlaces : toPlaces; }
+  function setPlaceList(kind, list) {
+    if (kind === "from") { fromPlaces = list; save(KEY_FROM_PLACES, list); }
+    else { toPlaces = list; save(KEY_TO_PLACES, list); }
+  }
+  function rememberPlace(kind, name) {
     name = (name || "").trim();
     if (!name) return;
-    places = places.filter(function (p) { return p !== name; });
-    places.unshift(name);
-    places = places.slice(0, 40);
-    save(KEY_PLACES, places);
+    var list = placeList(kind).filter(function (p) { return p !== name; });
+    list.unshift(name);
+    setPlaceList(kind, list.slice(0, 40));
   }
 
   function renderPeople() {
@@ -303,9 +326,9 @@ textarea {
     }
   }
   // 使った場所のボタン：いつも出る、ボタンの場所（銀座、横浜、など）は、ここには、出さない
-  function recentPlaces() {
-    var fixed = FROM_FIXED.concat(TO_FIXED);
-    return places.filter(function (p) { return fixed.indexOf(p) < 0; }).slice(0, 5);
+  function recentPlaces(kind) {
+    var fixed = kind === "from" ? FROM_FIXED : TO_FIXED;
+    return placeList(kind).filter(function (p) { return fixed.indexOf(p) < 0; }).slice(0, 5);
   }
   function makeChip(p, inputId, deletable) {
     var wrap = document.createElement("span");
@@ -323,8 +346,9 @@ textarea {
       x.textContent = "×";
       x.setAttribute("aria-label", p + "を、ボタンから消す");
       x.addEventListener("click", function () {
-        places = places.filter(function (q) { return q !== p; });
-        save(KEY_PLACES, places);
+        // ×は、その欄（乗車地か降車地）の履歴からだけ消す
+        var kind = inputId === "from" ? "from" : "to";
+        setPlaceList(kind, placeList(kind).filter(function (q) { return q !== p; }));
         renderPlaces();
       });
       wrap.appendChild(x);
@@ -363,15 +387,17 @@ textarea {
     });
   }
   function renderPlaces() {
-    var dl = $("places");
-    dl.innerHTML = "";
-    places.forEach(function (p) {
-      var o = document.createElement("option");
-      o.value = p;
-      dl.appendChild(o);
+    [["placesFrom", "from"], ["placesTo", "to"]].forEach(function (pair) {
+      var dl = $(pair[0]);
+      dl.innerHTML = "";
+      placeList(pair[1]).forEach(function (p) {
+        var o = document.createElement("option");
+        o.value = p;
+        dl.appendChild(o);
+      });
     });
-    renderChips("fromChips", "from", FROM_FIXED, recentPlaces());
-    renderChips("toChips", "to", TO_FIXED, recentPlaces());
+    renderChips("fromChips", "from", FROM_FIXED, recentPlaces("from"));
+    renderChips("toChips", "to", TO_FIXED, recentPlaces("to"));
   }
 
   function lineOf(t) {
@@ -509,7 +535,7 @@ textarea {
     if (wasEdit) { currentTrips()[editIndex] = trip; doneMsg = (editIndex + 1) + "件目を、直しました"; }
     else { currentTrips().push(trip); }
     delete sent[$("date").value]; save(KEY_SENT, sent);
-    rememberPlace(from); rememberPlace(to);
+    rememberPlace("from", from); rememberPlace("to", to);
     save(KEY_DAYS, days);
     // 追加したあと（直したあと）は、全部の欄を、空にする（乗車地も）
     endEdit(); clearForm(); renderAll();
